@@ -1,0 +1,49 @@
+node_modules
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+/.cache
+/build
+/app/build
+/public/build/
+/public/_dev
+/app/public/build
+
+# Prisma
+/prisma/dev.sqlite
+/prisma/dev.sqlite-journal
+database.sqlite
+*.sqlite
+*.sqlite-journal
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+
+# Coverage
+coverage/
+
+# Shopify
+.shopify/*
+.shopify.lock
+
+# React Router
+.react-router/
+
+# Editor
+.vscode/
+.cursor/
+
+# Gemini
+.gemini/
+
+# Extensions build
+/extensions/*/dist
