@@ -1,22 +1,19 @@
 import shopify from "../shopify.server";
 
 export async function getOfflineGraphqlClient(shop) {
-  const sessionId = shopify.api.session.getOfflineId(shop);
-  const session = await shopify.config.sessionStorage.loadSession(sessionId);
-  
-  if (!session) {
-    throw new Error(`No offline session found for shop: ${shop}`);
+  try {
+    const { admin } = await shopify.unauthenticated.admin(shop);
+    return admin;
+  } catch (error) {
+    throw new Error(`Failed to load offline session for shop: ${shop}. Error: ${error.message}`);
   }
-
-  const client = new shopify.api.clients.Graphql({ session });
-  return client;
 }
 
-export async function applyVariantPrice(client, variantId, newPrice) {
+export async function applyVariantPrice(admin, productId, variantId, newPrice) {
   const mutation = `
-    mutation productVariantUpdate($input: ProductVariantInput!) {
-      productVariantUpdate(input: $input) {
-        productVariant {
+    mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+        productVariants {
           id
           price
         }
@@ -28,22 +25,31 @@ export async function applyVariantPrice(client, variantId, newPrice) {
     }
   `;
 
-  const response = await client.request(mutation, {
+  const response = await admin.graphql(mutation, {
     variables: {
-      input: {
-        id: variantId,
-        price: newPrice.toString()
-      }
+      productId: productId,
+      variants: [
+        {
+          id: variantId,
+          price: newPrice.toString()
+        }
+      ]
     }
   });
 
-  if (response.data?.productVariantUpdate?.userErrors?.length > 0) {
-    throw new Error(response.data.productVariantUpdate.userErrors.map(e => e.message).join(", "));
+  const responseJson = await response.json();
+
+  if (responseJson.errors) {
+    throw new Error(responseJson.errors.map(e => e.message).join(", "));
+  }
+
+  if (responseJson.data?.productVariantsBulkUpdate?.userErrors?.length > 0) {
+    throw new Error(responseJson.data.productVariantsBulkUpdate.userErrors.map(e => e.message).join(", "));
   }
 
   return true;
 }
 
-export async function restoreVariantPrice(client, variantId, originalPrice) {
-  return applyVariantPrice(client, variantId, originalPrice);
+export async function restoreVariantPrice(admin, productId, variantId, originalPrice) {
+  return applyVariantPrice(admin, productId, variantId, originalPrice);
 }
