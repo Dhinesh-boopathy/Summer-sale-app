@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import prisma from "../db.server";
-import { getOfflineGraphqlClient, applyVariantPrice, restoreVariantPrice } from "./shopifyPrice.server";
+import { getOfflineGraphqlClient, applyProductVariantsPrice } from "./shopifyPrice.server";
 
 console.log("Scheduler initializing...");
 
@@ -26,22 +26,42 @@ async function processScheduledSales() {
   for (const sale of scheduledSales) {
     console.log(`Starting scheduled sale: ${sale.name} (${sale.id})`);
     
+    await prisma.sale.update({
+      where: { id: sale.id },
+      data: { status: "Starting" }
+    });
+    
     try {
       const client = await getOfflineGraphqlClient(sale.shop);
       let successCount = 0;
 
+      const groupedByProduct = {};
       for (const item of sale.items) {
         if (!item.variantId || !item.productId) continue;
-        
+        if (!groupedByProduct[item.productId]) {
+          groupedByProduct[item.productId] = [];
+        }
+        groupedByProduct[item.productId].push({
+          id: item.variantId,
+          price: item.salePrice.toString(),
+          _dbId: item.id
+        });
+      }
+
+      for (const [productId, variants] of Object.entries(groupedByProduct)) {
         try {
-          await applyVariantPrice(client, item.productId, item.variantId, item.salePrice);
-          await prisma.saleItem.update({
-            where: { id: item.id },
+          const shopifyVariants = variants.map(v => ({ id: v.id, price: v.price }));
+          await applyProductVariantsPrice(client, productId, shopifyVariants);
+          
+          const dbIds = variants.map(v => v._dbId);
+          await prisma.saleItem.updateMany({
+            where: { id: { in: dbIds } },
             data: { appliedAt: new Date() }
           });
-          successCount++;
+          
+          successCount += variants.length;
         } catch (itemError) {
-          console.error(`Failed to apply sale price for variant ${item.variantId}:`, itemError.message || itemError);
+          console.error(`Failed to apply sale price for product ${productId}:`, itemError.message || itemError);
         }
       }
 
@@ -82,22 +102,42 @@ async function processRunningSales() {
   for (const sale of runningSales) {
     console.log(`Ending running sale: ${sale.name} (${sale.id})`);
     
+    await prisma.sale.update({
+      where: { id: sale.id },
+      data: { status: "Ending" }
+    });
+    
     try {
       const client = await getOfflineGraphqlClient(sale.shop);
       let successCount = 0;
 
+      const groupedByProduct = {};
       for (const item of sale.items) {
         if (!item.variantId || !item.productId) continue;
-        
+        if (!groupedByProduct[item.productId]) {
+          groupedByProduct[item.productId] = [];
+        }
+        groupedByProduct[item.productId].push({
+          id: item.variantId,
+          price: item.originalPrice.toString(),
+          _dbId: item.id
+        });
+      }
+
+      for (const [productId, variants] of Object.entries(groupedByProduct)) {
         try {
-          await restoreVariantPrice(client, item.productId, item.variantId, item.originalPrice);
-          await prisma.saleItem.update({
-            where: { id: item.id },
+          const shopifyVariants = variants.map(v => ({ id: v.id, price: v.price }));
+          await applyProductVariantsPrice(client, productId, shopifyVariants);
+          
+          const dbIds = variants.map(v => v._dbId);
+          await prisma.saleItem.updateMany({
+            where: { id: { in: dbIds } },
             data: { restoredAt: new Date() }
           });
-          successCount++;
+          
+          successCount += variants.length;
         } catch (itemError) {
-          console.error(`Failed to restore price for variant ${item.variantId}:`, itemError.message || itemError);
+          console.error(`Failed to restore price for product ${productId}:`, itemError.message || itemError);
         }
       }
 

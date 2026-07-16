@@ -9,7 +9,7 @@ export async function getOfflineGraphqlClient(shop) {
   }
 }
 
-export async function applyVariantPrice(admin, productId, variantId, newPrice) {
+export async function applyProductVariantsPrice(admin, productId, variants) {
   const mutation = `
     mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
       productVariantsBulkUpdate(productId: $productId, variants: $variants) {
@@ -28,12 +28,7 @@ export async function applyVariantPrice(admin, productId, variantId, newPrice) {
   const response = await admin.graphql(mutation, {
     variables: {
       productId: productId,
-      variants: [
-        {
-          id: variantId,
-          price: newPrice.toString()
-        }
-      ]
+      variants: variants
     }
   });
 
@@ -48,6 +43,15 @@ export async function applyVariantPrice(admin, productId, variantId, newPrice) {
   }
 
   return true;
+}
+
+export async function applyVariantPrice(admin, productId, variantId, newPrice) {
+  return applyProductVariantsPrice(admin, productId, [
+    {
+      id: variantId,
+      price: newPrice.toString()
+    }
+  ]);
 }
 
 export async function restoreVariantPrice(admin, productId, variantId, originalPrice) {
