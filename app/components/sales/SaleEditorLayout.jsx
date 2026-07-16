@@ -245,15 +245,16 @@ export function SaleEditorLayout({
                   <th style={{ padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Product</th>
                   <th style={{ padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Status</th>
                   <th style={{ padding: '12px 8px', borderBottom: '1px solid #ccc' }}>SKU</th>
+                  <th style={{ padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Compare at Price</th>
                   <th style={{ padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Current Price</th>
                   <th style={{ padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {isSearching && nodes.length === 0 ? (
-                  <tr><td colSpan="6" style={{ padding: '32px', textAlign: 'center' }}><s-text>Loading...</s-text></td></tr>
+                  <tr><td colSpan="7" style={{ padding: '32px', textAlign: 'center' }}><s-text>Loading...</s-text></td></tr>
                 ) : !searchError && nodes.length === 0 ? (
-                  <tr><td colSpan="6" style={{ padding: '32px', textAlign: 'center' }}><s-text>No products found.</s-text></td></tr>
+                  <tr><td colSpan="7" style={{ padding: '32px', textAlign: 'center' }}><s-text>No products found.</s-text></td></tr>
                 ) : (
                   nodes.map((product) => {
                     const variant = product.variants?.nodes?.[0];
@@ -283,6 +284,11 @@ export function SaleEditorLayout({
                           </span>
                         </td>
                         <td style={{ padding: '12px 8px' }}><s-text>{variant?.sku || '-'}</s-text></td>
+                        <td style={{ padding: '12px 8px' }}>
+                          <s-text tone={variant?.compareAtPrice ? "subdued" : "base"} textDecoration={variant?.compareAtPrice ? "line-through" : "none"}>
+                            {variant?.compareAtPrice ? `$${variant.compareAtPrice}` : '-'}
+                          </s-text>
+                        </td>
                         <td style={{ padding: '12px 8px' }}><s-text>{variant?.price ? `$${variant.price}` : '-'}</s-text></td>
                         <td style={{ padding: '12px 8px' }}>
                           <s-button onClick={() => handleAddProduct(product)} disabled={isSearching}>Add to Sale</s-button>

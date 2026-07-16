@@ -31,6 +31,7 @@ export async function searchProducts(admin, { query, cursor, direction = 'next',
               title
               sku
               price
+              compareAtPrice
             }
           }
         }
