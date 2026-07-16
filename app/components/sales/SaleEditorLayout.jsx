@@ -24,7 +24,28 @@ export function SaleEditorLayout({
   const [saleName, setSaleName] = useState(initialSaleName || "");
   const [startAt, setStartAt] = useState(initialStartAt || "");
   const [endAt, setEndAt] = useState(initialEndAt || "");
-  const [selectedProducts, setSelectedProducts] = useState(initialProducts || []);
+  const [selectedProducts, setSelectedProducts] = useState(() => {
+    const grouped = {};
+    for (const p of initialProducts || []) {
+      if (!grouped[p.productId]) {
+        grouped[p.productId] = {
+          id: p.productId,
+          productId: p.productId,
+          title: p.title.includes(' - ') ? p.title.split(' - ').slice(0, -1).join(' - ') : p.title,
+          sku: p.sku,
+          originalPrice: p.originalPrice,
+          salePrice: p.salePrice,
+          imageUrl: p.imageUrl,
+          imageAlt: p.imageAlt,
+          variants: []
+        };
+      } else {
+        grouped[p.productId].sku = 'Multiple SKUs';
+      }
+      grouped[p.productId].variants.push(p);
+    }
+    return Object.values(grouped);
+  });
   const [queryValue, setQueryValue] = useState(searchQuery || "");
 
   useEffect(() => { setQueryValue(searchQuery || ""); }, [searchQuery]);
@@ -38,37 +59,39 @@ export function SaleEditorLayout({
     const variants = product.variants?.nodes || [];
     if (variants.length === 0) return;
 
-    const newItems = [];
-    let addedCount = 0;
-
-    for (const variant of variants) {
-      const exists = selectedProducts.find(p => p.variantId === variant.id);
-      if (!exists) {
-        const price = parseFloat(variant.price || 0);
-        newItems.push({
-          id: variant.id, 
-          productId: product.id,
-          variantId: variant.id,
-          title: variants.length > 1 && variant.title && variant.title !== 'Default Title' 
-            ? `${product.title} - ${variant.title}` 
-            : product.title,
-          sku: variant.sku || '-',
-          originalPrice: price,
-          salePrice: price,
-          imageUrl: product.featuredImage?.url,
-          imageAlt: product.featuredImage?.altText || product.title,
-        });
-        addedCount++;
-      }
-    }
-
-    if (addedCount === 0) {
-      shopify.toast.show("All variants of this product are already in the sale", { isError: true });
+    const exists = selectedProducts.find(p => p.productId === product.id);
+    if (exists) {
+      shopify.toast.show("Product is already in the sale", { isError: true });
       return;
     }
 
-    setSelectedProducts(prev => [...prev, ...newItems]);
-    shopify.toast.show(`Added ${addedCount} variant(s) to sale`);
+    const price = parseFloat(variants[0].price || 0);
+
+    const newItem = {
+      id: product.id, 
+      productId: product.id,
+      title: product.title,
+      sku: variants.length > 1 ? 'Multiple SKUs' : (variants[0].sku || '-'),
+      originalPrice: price,
+      salePrice: price,
+      imageUrl: product.featuredImage?.url,
+      imageAlt: product.featuredImage?.altText || product.title,
+      variants: variants.map(v => ({
+        id: v.id,
+        productId: product.id,
+        variantId: v.id,
+        title: variants.length > 1 && v.title && v.title !== 'Default Title' 
+          ? `${product.title} - ${v.title}` 
+          : product.title,
+        sku: v.sku || '-',
+        originalPrice: parseFloat(v.price || 0),
+        salePrice: price,
+        imageUrl: product.featuredImage?.url
+      }))
+    };
+
+    setSelectedProducts(prev => [...prev, newItem]);
+    shopify.toast.show(`Added product with ${variants.length} variant(s) to sale`);
   };
 
   const handleUpdateSalePrice = (id, newPrice) => {
@@ -111,7 +134,17 @@ export function SaleEditorLayout({
     formData.append("saleName", saleName);
     if (startAt) formData.append("startAt", new Date(startAt).toISOString());
     if (endAt) formData.append("endAt", new Date(endAt).toISOString());
-    formData.append("products", JSON.stringify(selectedProducts));
+    
+    const flatProducts = [];
+    for (const p of selectedProducts) {
+      for (const v of p.variants) {
+        flatProducts.push({
+          ...v,
+          salePrice: p.salePrice
+        });
+      }
+    }
+    formData.append("products", JSON.stringify(flatProducts));
     
     submit(formData, { method: "POST" });
   };
