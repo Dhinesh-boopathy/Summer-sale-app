@@ -2,7 +2,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { listSales } from "../services/sales.server";
 import { DashboardLayout } from "../components/dashboard/DashboardLayout";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useRouteError } from "react-router";
 
 export const loader = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
@@ -53,3 +53,16 @@ export default function Index() {
 export const headers = (headersArgs) => {
   return boundary.headers(headersArgs);
 };
+
+export function ErrorBoundary() {
+  const error = useRouteError();
+  console.error(error);
+  return (
+    <div style={{ padding: "20px", color: "red", backgroundColor: "#fee" }}>
+      <h2>Dashboard Error</h2>
+      <pre style={{ whiteSpace: "pre-wrap" }}>
+        {error instanceof Error ? error.stack : JSON.stringify(error)}
+      </pre>
+    </div>
+  );
+}
