@@ -25,7 +25,7 @@ api_version = "2026-10"
 scopes = "write_metaobject_definitions,write_metaobjects,write_products"
 
 [auth]
-redirect_urls = [ "https://summer-sale-app-xkmi.onrender.com" ]
+redirect_urls = [ "https://summer-sale-app-xkmi.onrender.com//api/auth" ]
 
 [product.metafields.app.demo_info]
 type = "single_line_text_field"
