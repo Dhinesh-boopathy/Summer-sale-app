@@ -1,41 +1,78 @@
-import { useNavigate } from "react-router";
+import PropTypes from "prop-types";
+import { Page, Layout, BlockStack, SkeletonPage, SkeletonBodyText, SkeletonDisplayText } from "@shopify/polaris";
+import { useNavigation } from "react-router";
+import { WelcomeHeader } from "./WelcomeHeader";
+import { StatisticsCards } from "./StatisticsCards";
+import { QuickActions } from "./QuickActions";
+import { RecentSales } from "./RecentSales";
+import { ActivityTimeline } from "./ActivityTimeline";
 
-export function DashboardLayout() {
-  const navigate = useNavigate();
+export function DashboardLayout({ sales, totalProducts, shopName }) {
+  const navigation = useNavigation();
+  const isLoading = navigation.state === "loading" || navigation.state === "submitting";
+
+  if (isLoading) {
+    return (
+      <SkeletonPage primaryAction>
+        <Layout>
+          <Layout.Section>
+            <BlockStack gap="400">
+              <SkeletonDisplayText size="large" />
+              <SkeletonBodyText lines={2} />
+              
+              {/* Skeleton cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+                 <SkeletonBodyText lines={4} />
+                 <SkeletonBodyText lines={4} />
+                 <SkeletonBodyText lines={4} />
+                 <SkeletonBodyText lines={4} />
+              </div>
+            </BlockStack>
+          </Layout.Section>
+        </Layout>
+      </SkeletonPage>
+    );
+  }
+
+  const scheduledSales = sales?.filter(s => s.status === "Scheduled").length || 0;
+  const runningSales = sales?.filter(s => s.status === "Running").length || 0;
+  const completedSales = sales?.filter(s => s.status === "Completed").length || 0;
+
+  const handleRefresh = () => {
+    // Basic refresh could just use window.location.reload() or re-fetch via useRevalidator()
+    window.location.reload();
+  };
 
   return (
-    <s-page heading="Summer Sale Manager">
-      <s-button slot="primary-action" onClick={() => navigate('/app/sales')}>
-        Create New Sale
-      </s-button>
-      
-      <s-stack direction="block" gap="base">
-        <s-section heading="Products">
-          <s-paragraph>Manage your products</s-paragraph>
-          <s-button onClick={() => navigate('/app/products')}>View Products</s-button>
-        </s-section>
+    <Page fullWidth>
+      <BlockStack gap="500">
+        <WelcomeHeader shopName={shopName} />
         
-        <s-section heading="Sales">
-          <s-paragraph>Manage your sales</s-paragraph>
-          <s-button onClick={() => navigate('/app/sales')}>View Sales</s-button>
-        </s-section>
+        <StatisticsCards 
+          totalProducts={totalProducts}
+          scheduledSales={scheduledSales}
+          runningSales={runningSales}
+          completedSales={completedSales}
+        />
         
-        <s-section heading="Scheduled Jobs">
-          <s-paragraph>Manage scheduled jobs</s-paragraph>
-          <s-button onClick={() => navigate('/app/settings')}>View Jobs</s-button>
-        </s-section>
+        <QuickActions onRefresh={handleRefresh} isRefreshing={isLoading} />
         
-        <s-section heading="Settings">
-          <s-paragraph>Configure your app</s-paragraph>
-          <s-button onClick={() => navigate('/app/settings')}>View Settings</s-button>
-        </s-section>
-      </s-stack>
-
-      <s-section heading="Recent Activity">
-        <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-          <s-text>No recent activity.</s-text>
-        </s-box>
-      </s-section>
-    </s-page>
+        <Layout>
+          <Layout.Section>
+            <RecentSales sales={sales} />
+          </Layout.Section>
+          
+          <Layout.Section variant="oneThird">
+            <ActivityTimeline sales={sales} />
+          </Layout.Section>
+        </Layout>
+      </BlockStack>
+    </Page>
   );
 }
+
+DashboardLayout.propTypes = {
+  sales: PropTypes.array,
+  totalProducts: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+  shopName: PropTypes.string,
+};

@@ -2,7 +2,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { listSales, deleteSale } from "../services/sales.server";
 import { SalesLayout } from "../components/sales/SalesLayout";
-import { useLoaderData, useFetcher } from "react-router";
+import { useLoaderData } from "react-router";
 
 export const loader = async ({ request }) => {
   await authenticate.admin(request);

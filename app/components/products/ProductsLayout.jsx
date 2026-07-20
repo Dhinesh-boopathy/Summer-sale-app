@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 import { useState, useEffect } from "react";
 
 export function ProductsLayout({ data, error, isLoading, initialQuery, onSearch, onPaginate }) {

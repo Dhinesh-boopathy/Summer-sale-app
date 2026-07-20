@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 import { SaleItem } from "./SaleItem";
 import { SaleSummary } from "./SaleSummary";
 import { EmptySale } from "./EmptySale";

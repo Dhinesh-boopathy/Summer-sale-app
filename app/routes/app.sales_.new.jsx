@@ -4,7 +4,6 @@ import { searchProducts } from "../services/product.server";
 import { createSale } from "../services/sales.server";
 import { SaleEditorLayout } from "../components/sales/SaleEditorLayout";
 import { useLoaderData, useNavigation, useSubmit, redirect } from "react-router";
-import { useAppBridge } from "@shopify/app-bridge-react";
 
 export const loader = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
@@ -45,10 +44,9 @@ export const action = async ({ request }) => {
 };
 
 export default function NewSalePage() {
-  const { shop, searchResults, searchError, query } = useLoaderData();
+  const { searchResults, searchError, query } = useLoaderData();
   const navigation = useNavigation();
   const submit = useSubmit();
-  const shopify = useAppBridge();
   
   const isSearching = navigation.state === "loading" && !navigation.formData?.get("intent");
 

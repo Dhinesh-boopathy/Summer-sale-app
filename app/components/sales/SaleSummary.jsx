@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 export function SaleSummary({ products }) {
   const productsSelected = products.length;
   

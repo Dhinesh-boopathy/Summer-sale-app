@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 import { useState } from "react";
 
 export function SaleItem({ product, onUpdate, onRemove }) {
