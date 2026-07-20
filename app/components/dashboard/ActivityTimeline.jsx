@@ -3,7 +3,7 @@ import PropTypes from "prop-types";
 import { Box, Card, Text, BlockStack, InlineStack, Icon } from "@shopify/polaris";
 import { 
   PlayIcon, 
-  CheckmarkCircleIcon, 
+  CheckCircleIcon, 
   ClockIcon, 
   PlusIcon 
 } from "@shopify/polaris-icons";
@@ -38,7 +38,7 @@ export function ActivityTimeline({ sales }) {
           id: `completed-${sale.id}`,
           title: `Sale "${sale.name}" completed, prices restored`,
           time: sale.endAt,
-          icon: CheckmarkCircleIcon,
+          icon: CheckCircleIcon,
           tone: "success"
         });
       }

@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types */
 import PropTypes from "prop-types";
 import { Box, Card, BlockStack, Text, Button, Icon, InlineGrid } from "@shopify/polaris";
-import { PlusIcon, ProductIcon, ListIcon, RefreshIcon } from "@shopify/polaris-icons";
+import { PlusIcon, ProductIcon, ListBulletedIcon, RefreshIcon } from "@shopify/polaris-icons";
 import { useNavigate } from "react-router";
 
 export function QuickActions({ onRefresh, isRefreshing }) {
@@ -51,7 +51,7 @@ export function QuickActions({ onRefresh, isRefreshing }) {
           <Card>
             <BlockStack gap="400" align="space-between">
               <BlockStack gap="200">
-                <Icon source={ListIcon} tone="interactive" />
+                <Icon source={ListBulletedIcon} tone="interactive" />
                 <Text variant="headingMd" as="h3">
                   Manage Sales
                 </Text>

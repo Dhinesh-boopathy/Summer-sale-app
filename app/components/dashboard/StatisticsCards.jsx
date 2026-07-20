@@ -4,7 +4,7 @@ import {
   ProductIcon,
   CalendarTimeIcon,
   PlayIcon,
-  CheckmarkCircleIcon,
+  CheckCircleIcon,
 } from "@shopify/polaris-icons";
 
 export function StatisticsCards({
@@ -39,7 +39,7 @@ export function StatisticsCards({
       title: "Completed Sales",
       value: completedSales,
       subtitle: "Finished successfully",
-      icon: CheckmarkCircleIcon,
+      icon: CheckCircleIcon,
       color: "textMagic",
     },
   ];
