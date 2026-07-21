@@ -183,7 +183,8 @@ export function SaleEditorLayout({
     >
       <Layout>
         <Layout.Section>
-          <BlockStack gap="400">
+          <div style={{ paddingBottom: '64px' }}>
+            <BlockStack gap="400">
             {!isEditable && (
               <Banner tone="warning">
                 <p>This sale is currently running or completed. Editing is disabled.</p>
@@ -348,7 +349,8 @@ export function SaleEditorLayout({
                 </Card>
               </BlockStack>
             )}
-          </BlockStack>
+            </BlockStack>
+          </div>
         </Layout.Section>
       </Layout>
     </Page>
