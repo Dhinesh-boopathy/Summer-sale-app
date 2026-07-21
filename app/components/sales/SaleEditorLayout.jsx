@@ -1,7 +1,22 @@
-/* eslint-disable react/prop-types */
 import { useState, useEffect } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { useSubmit, useNavigation } from "react-router";
+import { 
+  Page, 
+  Layout, 
+  Card, 
+  BlockStack, 
+  InlineStack, 
+  TextField, 
+  Text, 
+  Banner, 
+  Button, 
+  IndexTable, 
+  Thumbnail, 
+  Badge,
+  FormLayout
+} from "@shopify/polaris";
+import { SearchIcon } from "@shopify/polaris-icons";
 import { SaleBuilder } from "./SaleBuilder";
 
 export function SaleEditorLayout({ 
@@ -152,166 +167,189 @@ export function SaleEditorLayout({
 
   const nodes = searchResults?.nodes || [];
   const pageInfo = searchResults?.pageInfo || {};
-
   const saveButtonLabel = (startAt && endAt) ? "Save & Schedule" : "Save Draft";
 
   return (
-    <s-page heading={initialSaleName ? "Edit Sale" : "Create New Sale"}>
-      {isEditable && (
-        <s-button slot="primary-action" onClick={handleSaveSale} disabled={isSaving}>
-          {isSaving ? "Saving..." : saveButtonLabel}
-        </s-button>
-      )}
-
-      {!isEditable && (
-        <s-box padding="base" background="bg-surface-warning" borderRadius="base" marginBottom="base">
-          <s-text color="warning">This sale is currently running or completed. Editing is disabled.</s-text>
-        </s-box>
-      )}
-
-      <s-section heading="Sale Details">
-        <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '600px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontWeight: '500' }}>Sale Name</label>
-              <input 
-                type="text" 
-                value={saleName}
-                onChange={(e) => setSaleName(e.target.value)}
-                placeholder="e.g. Summer Blowout 2026"
-                disabled={!isEditable}
-                style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-              />
-            </div>
-            
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
-                <label style={{ fontWeight: '500' }}>Start Date & Time (Optional)</label>
-                <input 
-                  type="datetime-local" 
-                  value={startAt}
-                  onChange={(e) => setStartAt(e.target.value)}
-                  disabled={!isEditable}
-                  style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
-                <label style={{ fontWeight: '500' }}>End Date & Time (Optional)</label>
-                <input 
-                  type="datetime-local" 
-                  value={endAt}
-                  onChange={(e) => setEndAt(e.target.value)}
-                  disabled={!isEditable}
-                  style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                />
-              </div>
-            </div>
-            {(startAt || endAt) && (
-              <s-text tone="subdued">Note: This sale will automatically start and end at the selected times.</s-text>
+    <Page 
+      title={initialSaleName ? "Edit Sale" : "Create New Sale"}
+      backAction={{ content: 'Sales', url: '/app/sales' }}
+      primaryAction={
+        isEditable ? {
+          content: isSaving ? "Saving..." : saveButtonLabel,
+          disabled: isSaving,
+          onAction: handleSaveSale
+        } : undefined
+      }
+    >
+      <Layout>
+        <Layout.Section>
+          <BlockStack gap="400">
+            {!isEditable && (
+              <Banner tone="warning">
+                <p>This sale is currently running or completed. Editing is disabled.</p>
+              </Banner>
             )}
-          </div>
-        </s-box>
-      </s-section>
 
-      <s-section heading="Sale Builder">
-        <SaleBuilder 
-          products={selectedProducts} 
-          onUpdateProduct={handleUpdateSalePrice} 
-          onRemoveProduct={handleRemoveProduct} 
-        />
-      </s-section>
-
-      {isEditable && (
-        <s-section heading="Search Products to Add">
-          <s-stack direction="inline" gap="base">
-            <input 
-              type="text" 
-              placeholder="Search products by title or SKU" 
-              value={queryValue}
-              onChange={(e) => setQueryValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', minWidth: '250px' }} 
-              disabled={isSearching}
-            />
-            <s-button onClick={handleSearchClick} disabled={isSearching}>
-              {isSearching ? "Searching..." : "Search"}
-            </s-button>
-          </s-stack>
-
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginTop: '16px' }}>
-              <thead>
-                <tr style={{ background: '#f4f6f8' }}>
-                  <th style={{ padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Image</th>
-                  <th style={{ padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Product</th>
-                  <th style={{ padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Status</th>
-                  <th style={{ padding: '12px 8px', borderBottom: '1px solid #ccc' }}>SKU</th>
-                  <th style={{ padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Compare at Price</th>
-                  <th style={{ padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Current Price</th>
-                  <th style={{ padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isSearching && nodes.length === 0 ? (
-                  <tr><td colSpan="7" style={{ padding: '32px', textAlign: 'center' }}><s-text>Loading...</s-text></td></tr>
-                ) : !searchError && nodes.length === 0 ? (
-                  <tr><td colSpan="7" style={{ padding: '32px', textAlign: 'center' }}><s-text>No products found.</s-text></td></tr>
-                ) : (
-                  nodes.map((product) => {
-                    const variant = product.variants?.nodes?.[0];
-                    const imageUrl = product.featuredImage?.url;
-                    
-                    return (
-                      <tr key={product.id} style={{ borderBottom: '1px solid #ebebeb' }}>
-                        <td style={{ padding: '12px 8px' }}>
-                          {imageUrl ? (
-                            <img src={imageUrl} alt={product.title} style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
-                          ) : (
-                            <div style={{ width: '40px', height: '40px', background: '#e1e3e5', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <span style={{ fontSize: '10px', color: '#6d7175' }}>No img</span>
-                            </div>
-                          )}
-                        </td>
-                        <td style={{ padding: '12px 8px' }}><s-text>{product.title}</s-text></td>
-                        <td style={{ padding: '12px 8px' }}>
-                          <span style={{ 
-                            padding: '2px 8px', 
-                            borderRadius: '12px', 
-                            fontSize: '12px',
-                            background: product.status === 'ACTIVE' ? '#aee9d1' : '#e3e5e7',
-                            color: product.status === 'ACTIVE' ? '#0b5c3e' : '#202223'
-                          }}>
-                            {product.status || '-'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px 8px' }}><s-text>{variant?.sku || '-'}</s-text></td>
-                        <td style={{ padding: '12px 8px' }}>
-                          <s-text tone={variant?.compareAtPrice ? "subdued" : "base"} textDecoration={variant?.compareAtPrice ? "line-through" : "none"}>
-                            {variant?.compareAtPrice ? `$${variant.compareAtPrice}` : '-'}
-                          </s-text>
-                        </td>
-                        <td style={{ padding: '12px 8px' }}><s-text>{variant?.price ? `$${variant.price}` : '-'}</s-text></td>
-                        <td style={{ padding: '12px 8px' }}>
-                          <s-button onClick={() => handleAddProduct(product)} disabled={isSearching}>Add to Sale</s-button>
-                        </td>
-                      </tr>
-                    );
-                  })
+            <Card>
+              <BlockStack gap="400">
+                <Text variant="headingMd" as="h2">Sale Details</Text>
+                
+                <FormLayout>
+                  <TextField 
+                    label="Sale Name"
+                    value={saleName}
+                    onChange={setSaleName}
+                    placeholder="e.g. Summer Blowout 2026"
+                    disabled={!isEditable}
+                    autoComplete="off"
+                  />
+                  
+                  <FormLayout.Group>
+                    <TextField 
+                      label="Start Date & Time (Optional)"
+                      type="datetime-local"
+                      value={startAt}
+                      onChange={setStartAt}
+                      disabled={!isEditable}
+                      autoComplete="off"
+                    />
+                    <TextField 
+                      label="End Date & Time (Optional)"
+                      type="datetime-local"
+                      value={endAt}
+                      onChange={setEndAt}
+                      disabled={!isEditable}
+                      autoComplete="off"
+                    />
+                  </FormLayout.Group>
+                </FormLayout>
+                
+                {(startAt || endAt) && (
+                  <Text tone="subdued">Note: This sale will automatically start and end at the selected times.</Text>
                 )}
-              </tbody>
-            </table>
-          </div>
-          
-          {!isSearching && nodes.length > 0 && (pageInfo.hasPreviousPage || pageInfo.hasNextPage) && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
-              <s-stack direction="inline" gap="base">
-                <s-button disabled={!pageInfo.hasPreviousPage} onClick={() => onPaginate(pageInfo.startCursor, 'prev')}>Previous</s-button>
-                <s-button disabled={!pageInfo.hasNextPage} onClick={() => onPaginate(pageInfo.endCursor, 'next')}>Next</s-button>
-              </s-stack>
-            </div>
-          )}
-        </s-section>
-      )}
-    </s-page>
+              </BlockStack>
+            </Card>
+
+            <BlockStack gap="200">
+              <Text variant="headingMd" as="h2">Sale Builder</Text>
+              <SaleBuilder 
+                products={selectedProducts} 
+                onUpdateProduct={handleUpdateSalePrice} 
+                onRemoveProduct={handleRemoveProduct} 
+              />
+            </BlockStack>
+
+            {isEditable && (
+              <BlockStack gap="200">
+                <Text variant="headingMd" as="h2">Search Products to Add</Text>
+                <Card padding="0">
+                  <div style={{ padding: '16px' }}>
+                    <InlineStack gap="300" blockAlign="center" wrap={false}>
+                      <div style={{ flex: 1 }}>
+                        <TextField 
+                          value={queryValue}
+                          onChange={setQueryValue}
+                          placeholder="Search products by title or SKU"
+                          autoComplete="off"
+                          disabled={isSearching}
+                          prefix={<SearchIcon />}
+                          onFocus={() => {}} // A small hack to allow onKeyDown if needed, but handled mostly by onChange or dedicated button
+                        />
+                      </div>
+                      <Button onClick={handleSearchClick} disabled={isSearching} variant="secondary">
+                        {isSearching ? "Searching..." : "Search"}
+                      </Button>
+                    </InlineStack>
+                  </div>
+                  
+                  <IndexTable
+                    resourceName={{ singular: 'product', plural: 'products' }}
+                    itemCount={nodes.length}
+                    selectable={false}
+                    headings={[
+                      { title: 'Image' },
+                      { title: 'Product' },
+                      { title: 'Status' },
+                      { title: 'SKU' },
+                      { title: 'Compare at Price' },
+                      { title: 'Current Price' },
+                      { title: 'Action' }
+                    ]}
+                  >
+                    {isSearching && nodes.length === 0 ? (
+                      <IndexTable.Row>
+                        <IndexTable.Cell colSpan={7}>
+                          <div style={{ padding: '32px', textAlign: 'center' }}>
+                            <Text>Loading...</Text>
+                          </div>
+                        </IndexTable.Cell>
+                      </IndexTable.Row>
+                    ) : !searchError && nodes.length === 0 ? (
+                      <IndexTable.Row>
+                        <IndexTable.Cell colSpan={7}>
+                          <div style={{ padding: '32px', textAlign: 'center' }}>
+                            <Text tone="subdued">No products found.</Text>
+                          </div>
+                        </IndexTable.Cell>
+                      </IndexTable.Row>
+                    ) : (
+                      nodes.map((product, index) => {
+                        const variant = product.variants?.nodes?.[0];
+                        const imageUrl = product.featuredImage?.url;
+                        
+                        return (
+                          <IndexTable.Row id={product.id} key={product.id} position={index}>
+                            <IndexTable.Cell>
+                              <Thumbnail
+                                source={imageUrl || ""}
+                                alt={product.title}
+                                size="small"
+                              />
+                            </IndexTable.Cell>
+                            <IndexTable.Cell>
+                              <Text variant="bodyMd" fontWeight="bold" as="span">{product.title}</Text>
+                            </IndexTable.Cell>
+                            <IndexTable.Cell>
+                              <Badge tone={product.status === 'ACTIVE' ? "success" : undefined}>
+                                {product.status || '-'}
+                              </Badge>
+                            </IndexTable.Cell>
+                            <IndexTable.Cell>
+                              <Text as="span">{variant?.sku || '-'}</Text>
+                            </IndexTable.Cell>
+                            <IndexTable.Cell>
+                              <Text tone={variant?.compareAtPrice ? "subdued" : "base"} textDecorationLine={variant?.compareAtPrice ? "line-through" : "none"}>
+                                {variant?.compareAtPrice ? `$${variant.compareAtPrice}` : '-'}
+                              </Text>
+                            </IndexTable.Cell>
+                            <IndexTable.Cell>
+                              <Text as="span">{variant?.price ? `$${variant.price}` : '-'}</Text>
+                            </IndexTable.Cell>
+                            <IndexTable.Cell>
+                              <Button onClick={() => handleAddProduct(product)} disabled={isSearching} size="micro">
+                                Add to Sale
+                              </Button>
+                            </IndexTable.Cell>
+                          </IndexTable.Row>
+                        );
+                      })
+                    )}
+                  </IndexTable>
+                  
+                  {!isSearching && nodes.length > 0 && (pageInfo.hasPreviousPage || pageInfo.hasNextPage) && (
+                    <div style={{ padding: '16px', display: 'flex', justifyContent: 'center' }}>
+                      <InlineStack gap="300">
+                        <Button disabled={!pageInfo.hasPreviousPage} onClick={() => onPaginate(pageInfo.startCursor, 'prev')}>Previous</Button>
+                        <Button disabled={!pageInfo.hasNextPage} onClick={() => onPaginate(pageInfo.endCursor, 'next')}>Next</Button>
+                      </InlineStack>
+                    </div>
+                  )}
+                </Card>
+              </BlockStack>
+            )}
+          </BlockStack>
+        </Layout.Section>
+      </Layout>
+    </Page>
   );
 }

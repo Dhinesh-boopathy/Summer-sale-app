@@ -1,42 +1,47 @@
-/* eslint-disable react/prop-types */
+import { Card, IndexTable, useIndexResourceState, BlockStack } from "@shopify/polaris";
 import { SaleItem } from "./SaleItem";
 import { SaleSummary } from "./SaleSummary";
 import { EmptySale } from "./EmptySale";
 
 export function SaleBuilder({ products, onUpdateProduct, onRemoveProduct }) {
+  const { selectedResources, allResourcesSelected, handleSelectionChange } = useIndexResourceState(products);
+
   if (products.length === 0) {
     return <EmptySale />;
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '500px', border: '1px solid #ebebeb', borderRadius: '8px' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ background: '#f4f6f8' }}>
-              <th style={{ position: 'sticky', top: 0, zIndex: 1, background: '#f4f6f8', padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Image</th>
-              <th style={{ position: 'sticky', top: 0, zIndex: 1, background: '#f4f6f8', padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Product</th>
-              <th style={{ position: 'sticky', top: 0, zIndex: 1, background: '#f4f6f8', padding: '12px 8px', borderBottom: '1px solid #ccc' }}>SKU</th>
-              <th style={{ position: 'sticky', top: 0, zIndex: 1, background: '#f4f6f8', padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Original Price</th>
-              <th style={{ position: 'sticky', top: 0, zIndex: 1, background: '#f4f6f8', padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Sale Price</th>
-              <th style={{ position: 'sticky', top: 0, zIndex: 1, background: '#f4f6f8', padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Discount %</th>
-              <th style={{ position: 'sticky', top: 0, zIndex: 1, background: '#f4f6f8', padding: '12px 8px', borderBottom: '1px solid #ccc' }}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map(product => (
-              <SaleItem 
-                key={product.id} 
-                product={product} 
-                onUpdate={onUpdateProduct} 
-                onRemove={onRemoveProduct} 
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <BlockStack gap="400">
+      <Card padding="0">
+        <IndexTable
+          resourceName={{ singular: "product", plural: "products" }}
+          itemCount={products.length}
+          selectedItemsCount={allResourcesSelected ? "All" : selectedResources.length}
+          onSelectionChange={handleSelectionChange}
+          selectable={false}
+          headings={[
+            { title: "Image" },
+            { title: "Product" },
+            { title: "SKU" },
+            { title: "Original Price" },
+            { title: "Sale Price" },
+            { title: "Discount %" },
+            { title: "Action" },
+          ]}
+        >
+          {products.map((product, index) => (
+            <SaleItem 
+              key={product.id} 
+              index={index}
+              product={product} 
+              onUpdate={onUpdateProduct} 
+              onRemove={onRemoveProduct} 
+            />
+          ))}
+        </IndexTable>
+      </Card>
 
       <SaleSummary products={products} />
-    </div>
+    </BlockStack>
   );
 }

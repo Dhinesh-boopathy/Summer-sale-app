@@ -1,4 +1,5 @@
-/* eslint-disable react/prop-types */
+import { Card, Text, BlockStack, InlineGrid } from "@shopify/polaris";
+
 export function SaleSummary({ products }) {
   const productsSelected = products.length;
   
@@ -11,29 +12,29 @@ export function SaleSummary({ products }) {
     : 0;
 
   return (
-    <s-box padding="base" background="subdued" borderRadius="base" borderWidth="base">
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <s-text tone="subdued">Products Selected</s-text>
-          <s-text variant="headingLg">{productsSelected}</s-text>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <s-text tone="subdued">Original Total</s-text>
-          <s-text variant="headingLg">${originalTotal.toFixed(2)}</s-text>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <s-text tone="subdued">Sale Total</s-text>
-          <s-text variant="headingLg">${saleTotal.toFixed(2)}</s-text>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <s-text tone="subdued">Total Discount</s-text>
-          <s-text variant="headingLg" color="success">${totalDiscountAmount.toFixed(2)}</s-text>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <s-text tone="subdued">Average Discount</s-text>
-          <s-text variant="headingLg" color="success">{averageDiscountPercent}%</s-text>
-        </div>
-      </div>
-    </s-box>
+    <Card background="bg-surface-secondary">
+      <InlineGrid columns={{ xs: 2, sm: 3, md: 5 }} gap="400">
+        <BlockStack gap="100">
+          <Text tone="subdued">Products Selected</Text>
+          <Text variant="headingLg" as="p">{productsSelected}</Text>
+        </BlockStack>
+        <BlockStack gap="100">
+          <Text tone="subdued">Original Total</Text>
+          <Text variant="headingLg" as="p">${originalTotal.toFixed(2)}</Text>
+        </BlockStack>
+        <BlockStack gap="100">
+          <Text tone="subdued">Sale Total</Text>
+          <Text variant="headingLg" as="p">${saleTotal.toFixed(2)}</Text>
+        </BlockStack>
+        <BlockStack gap="100">
+          <Text tone="subdued">Total Discount</Text>
+          <Text variant="headingLg" as="p" tone="success">${totalDiscountAmount.toFixed(2)}</Text>
+        </BlockStack>
+        <BlockStack gap="100">
+          <Text tone="subdued">Average Discount</Text>
+          <Text variant="headingLg" as="p" tone="success">{averageDiscountPercent}%</Text>
+        </BlockStack>
+      </InlineGrid>
+    </Card>
   );
 }
