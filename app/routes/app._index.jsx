@@ -55,13 +55,34 @@ export const headers = (headersArgs) => {
 };
 
 export function ErrorBoundary() {
+  const { useRouteError, isRouteErrorResponse } = require("react-router");
   const error = useRouteError();
   console.error(error);
+
+  // If this is a Response (e.g. auth redirect), let Shopify's root boundary handle it
+  if (error instanceof Response) {
+    throw error;
+  }
+
+  let errorMessage = "Unknown error";
+  let errorStack = "";
+
+  if (isRouteErrorResponse(error)) {
+    errorMessage = `${error.status} ${error.statusText}`;
+    errorStack = error.data instanceof Error ? error.data.stack : JSON.stringify(error.data);
+  } else if (error instanceof Error) {
+    errorMessage = error.message;
+    errorStack = error.stack;
+  } else {
+    errorMessage = typeof error === "string" ? error : JSON.stringify(error);
+  }
+
   return (
-    <div style={{ padding: "20px", color: "red", backgroundColor: "#fee" }}>
+    <div style={{ padding: "20px", color: "red", backgroundColor: "#fee", margin: "20px", borderRadius: "8px", border: "1px solid red" }}>
       <h2>Dashboard Error</h2>
-      <pre style={{ whiteSpace: "pre-wrap" }}>
-        {error instanceof Error ? error.stack : JSON.stringify(error)}
+      <p style={{ fontWeight: "bold" }}>{errorMessage}</p>
+      <pre style={{ whiteSpace: "pre-wrap", marginTop: "10px", fontSize: "12px", overflowX: "auto" }}>
+        {errorStack}
       </pre>
     </div>
   );
