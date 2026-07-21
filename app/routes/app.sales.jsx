@@ -1,7 +1,7 @@
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { listSales, deleteSale } from "../services/sales.server";
-import { SalesLayout } from "../components/sales/SalesLayout";
+import { SalesDashboardLayout } from "../components/sales/dashboard/SalesDashboardLayout";
 import { useLoaderData } from "react-router";
 
 export const loader = async ({ request }) => {
@@ -27,7 +27,7 @@ export const action = async ({ request }) => {
 
 export default function SalesPage() {
   const { sales, q } = useLoaderData();
-  return <SalesLayout sales={sales} initialQuery={q} />;
+  return <SalesDashboardLayout sales={sales} initialQuery={q} />;
 }
 
 export const headers = (headersArgs) => boundary.headers(headersArgs);
