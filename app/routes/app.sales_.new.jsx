@@ -52,9 +52,9 @@ export default function NewSalePage() {
 
   const handleSearch = (newQuery) => {
     if (!newQuery) {
-      submit({}, { replace: true });
+      submit({}, { replace: true, preventScrollReset: true });
     } else {
-      submit({ q: newQuery }, { replace: true });
+      submit({ q: newQuery }, { replace: true, preventScrollReset: true });
     }
   };
 
@@ -65,7 +65,7 @@ export default function NewSalePage() {
       params.cursor = newCursor;
       params.direction = dir;
     }
-    submit(params);
+    submit(params, { preventScrollReset: true });
   };
 
   return (

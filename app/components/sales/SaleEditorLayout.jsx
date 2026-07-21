@@ -244,22 +244,23 @@ export function SaleEditorLayout({
                 <Text variant="headingMd" as="h2">Search Products to Add</Text>
                 <Card padding="0">
                   <div style={{ padding: '16px' }}>
-                    <InlineStack gap="300" blockAlign="center" wrap={false}>
-                      <div style={{ flex: 1 }}>
-                        <TextField 
-                          value={queryValue}
-                          onChange={setQueryValue}
-                          placeholder="Search products by title or SKU"
-                          autoComplete="off"
-                          disabled={isSearching}
-                          prefix={<SearchIcon />}
-                          onFocus={() => {}} // A small hack to allow onKeyDown if needed, but handled mostly by onChange or dedicated button
-                        />
-                      </div>
-                      <Button onClick={handleSearchClick} disabled={isSearching} variant="secondary">
-                        {isSearching ? "Searching..." : "Search"}
-                      </Button>
-                    </InlineStack>
+                    <form onSubmit={(e) => { e.preventDefault(); handleSearchClick(); }}>
+                      <InlineStack gap="300" blockAlign="center" wrap={false}>
+                        <div style={{ flex: 1 }}>
+                          <TextField 
+                            value={queryValue}
+                            onChange={setQueryValue}
+                            placeholder="Search products by title or SKU"
+                            autoComplete="off"
+                            disabled={isSearching}
+                            prefix={<SearchIcon />}
+                          />
+                        </div>
+                        <Button submit disabled={isSearching} variant="secondary">
+                          {isSearching ? "Searching..." : "Search"}
+                        </Button>
+                      </InlineStack>
+                    </form>
                   </div>
                   
                   <IndexTable
