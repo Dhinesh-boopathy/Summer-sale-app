@@ -2,13 +2,21 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { listSales } from "../services/sales.server";
 import { DashboardLayout } from "../components/dashboard/DashboardLayout";
-import { useLoaderData, useRouteError } from "react-router";
+import { useLoaderData, useRouteError, isRouteErrorResponse } from "react-router";
+import { Banner } from "@shopify/polaris";
 
 export const loader = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
   
-  // Fetch sales for the dashboard
-  const sales = await listSales();
+  // Fetch sales for the dashboard with error handling for DB timeouts
+  let sales = [];
+  let dbError = false;
+  try {
+    sales = await listSales();
+  } catch (error) {
+    console.error("Failed to fetch sales from database:", error.message || error);
+    dbError = true;
+  }
   
   // Attempt to fetch an approximate product count
   let totalProducts = 0;
@@ -34,19 +42,29 @@ export const loader = async ({ request }) => {
   return { 
     sales, 
     totalProducts, 
-    shopName: session?.shop || "Admin"
+    shopName: session?.shop || "Admin",
+    dbError
   };
 };
 
 export default function Index() {
-  const { sales, totalProducts, shopName } = useLoaderData();
+  const { sales, totalProducts, shopName, dbError } = useLoaderData();
   
   return (
-    <DashboardLayout 
-      sales={sales} 
-      totalProducts={totalProducts} 
-      shopName={shopName} 
-    />
+    <>
+      {dbError && (
+        <div style={{ margin: "1rem" }}>
+          <Banner title="Database Connection Issue" tone="critical">
+            <p>Could not connect to the database to fetch sales. Your database (Neon) might be waking up or temporarily unavailable. Please refresh the page in a few seconds.</p>
+          </Banner>
+        </div>
+      )}
+      <DashboardLayout 
+        sales={sales} 
+        totalProducts={totalProducts} 
+        shopName={shopName} 
+      />
+    </>
   );
 }
 
@@ -55,7 +73,6 @@ export const headers = (headersArgs) => {
 };
 
 export function ErrorBoundary() {
-  const { useRouteError, isRouteErrorResponse } = require("react-router");
   const error = useRouteError();
   console.error(error);
 
