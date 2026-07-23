@@ -44,13 +44,14 @@ async function processScheduledSales() {
         groupedByProduct[item.productId].push({
           id: item.variantId,
           price: item.salePrice.toString(),
+          compareAtPrice: item.originalPrice.toString(),
           _dbId: item.id
         });
       }
 
       for (const [productId, variants] of Object.entries(groupedByProduct)) {
         try {
-          const shopifyVariants = variants.map(v => ({ id: v.id, price: v.price }));
+          const shopifyVariants = variants.map(v => ({ id: v.id, price: v.price, compareAtPrice: v.compareAtPrice }));
           await applyProductVariantsPrice(client, productId, shopifyVariants);
           
           const dbIds = variants.map(v => v._dbId);
@@ -120,13 +121,14 @@ async function processRunningSales() {
         groupedByProduct[item.productId].push({
           id: item.variantId,
           price: item.originalPrice.toString(),
+          compareAtPrice: null,
           _dbId: item.id
         });
       }
 
       for (const [productId, variants] of Object.entries(groupedByProduct)) {
         try {
-          const shopifyVariants = variants.map(v => ({ id: v.id, price: v.price }));
+          const shopifyVariants = variants.map(v => ({ id: v.id, price: v.price, compareAtPrice: v.compareAtPrice }));
           await applyProductVariantsPrice(client, productId, shopifyVariants);
           
           const dbIds = variants.map(v => v._dbId);

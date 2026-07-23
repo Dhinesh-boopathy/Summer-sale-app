@@ -16,6 +16,7 @@ export async function applyProductVariantsPrice(admin, productId, variants) {
         productVariants {
           id
           price
+          compareAtPrice
         }
         userErrors {
           field
