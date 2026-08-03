@@ -10,6 +10,8 @@ export function RecentSales({ sales }) {
     switch (status) {
       case "Scheduled":
         return <Badge tone="info">Scheduled</Badge>;
+      case "Starting":
+        return <Badge tone="attention" progress="incomplete">Starting</Badge>;
       case "Running":
         return <Badge tone="warning">Running</Badge>;
       case "Completed":

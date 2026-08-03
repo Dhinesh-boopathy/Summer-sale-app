@@ -21,7 +21,8 @@ export function DashboardLayout({ sales, totalProducts, shopName }) {
               <SkeletonBodyText lines={2} />
               
               {/* Skeleton cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
+                 <SkeletonBodyText lines={4} />
                  <SkeletonBodyText lines={4} />
                  <SkeletonBodyText lines={4} />
                  <SkeletonBodyText lines={4} />
@@ -35,6 +36,7 @@ export function DashboardLayout({ sales, totalProducts, shopName }) {
   }
 
   const scheduledSales = sales?.filter(s => s.status === "Scheduled").length || 0;
+  const startingSales = sales?.filter(s => s.status === "Starting").length || 0;
   const runningSales = sales?.filter(s => s.status === "Running").length || 0;
   const completedSales = sales?.filter(s => s.status === "Completed").length || 0;
 
@@ -51,6 +53,7 @@ export function DashboardLayout({ sales, totalProducts, shopName }) {
         <StatisticsCards 
           totalProducts={totalProducts}
           scheduledSales={scheduledSales}
+          startingSales={startingSales}
           runningSales={runningSales}
           completedSales={completedSales}
         />

@@ -3,6 +3,7 @@ import { Box, Card, Text, InlineStack, BlockStack, Icon, InlineGrid } from "@sho
 import {
   ProductIcon,
   CalendarTimeIcon,
+  ClockIcon,
   PlayIcon,
   CheckCircleIcon,
 } from "@shopify/polaris-icons";
@@ -10,6 +11,7 @@ import {
 export function StatisticsCards({
   totalProducts,
   scheduledSales,
+  startingSales,
   runningSales,
   completedSales,
 }) {
@@ -29,6 +31,13 @@ export function StatisticsCards({
       color: "textInfo",
     },
     {
+      title: "Starting Sales",
+      value: startingSales,
+      subtitle: "Applying prices to products",
+      icon: ClockIcon,
+      color: "textCaution",
+    },
+    {
       title: "Running Sales",
       value: runningSales,
       subtitle: "Currently active",
@@ -46,7 +55,7 @@ export function StatisticsCards({
 
   return (
     <Box paddingBlockEnd="400">
-      <InlineGrid columns={{ xs: 1, sm: 2, md: 4 }} gap="400">
+      <InlineGrid columns={{ xs: 1, sm: 2, md: 3, lg: 5 }} gap="400">
         {cards.map((card, index) => (
           <Card key={index} roundedAbove="sm">
             <BlockStack gap="400">
@@ -75,6 +84,7 @@ export function StatisticsCards({
 StatisticsCards.propTypes = {
   totalProducts: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   scheduledSales: PropTypes.number,
+  startingSales: PropTypes.number,
   runningSales: PropTypes.number,
   completedSales: PropTypes.number,
 };

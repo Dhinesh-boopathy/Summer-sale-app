@@ -24,6 +24,7 @@ export function SalesLayout({ sales, initialQuery }) {
 
   const draftSales = sales.filter(s => s.status === "Draft");
   const scheduledSales = sales.filter(s => s.status === "Scheduled");
+  const startingSales = sales.filter(s => s.status === "Starting");
   const runningSales = sales.filter(s => s.status === "Running");
   const completedSales = sales.filter(s => s.status === "Completed");
   const failedSales = sales.filter(s => s.status === "Failed");
@@ -111,6 +112,10 @@ export function SalesLayout({ sales, initialQuery }) {
 
         <s-section heading="Running Sales">
           {renderSalesTable(runningSales, false)}
+        </s-section>
+
+        <s-section heading="Starting Sales">
+          {renderSalesTable(startingSales, false)}
         </s-section>
 
         <s-section heading="Scheduled Sales">
