@@ -11,6 +11,8 @@ export async function createSale(data) {
     data: {
       shop: data.shop || "",
       name: data.name,
+      saleType: data.saleType || "PRODUCT",
+      collections: data.collections || null,
       status: status,
       startAt: data.startAt ? new Date(data.startAt) : null,
       endAt: data.endAt ? new Date(data.endAt) : null,
@@ -42,6 +44,8 @@ export async function updateSale(id, data) {
     where: { id },
     data: {
       name: data.name,
+      saleType: data.saleType || "PRODUCT",
+      collections: data.collections || null,
       status: status,
       startAt: data.startAt ? new Date(data.startAt) : null,
       endAt: data.endAt ? new Date(data.endAt) : null,

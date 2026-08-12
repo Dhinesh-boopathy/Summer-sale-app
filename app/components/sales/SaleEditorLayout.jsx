@@ -14,7 +14,8 @@ import {
   IndexTable, 
   Thumbnail, 
   Badge,
-  FormLayout
+  FormLayout,
+  Select
 } from "@shopify/polaris";
 import { SearchIcon } from "@shopify/polaris-icons";
 import { SaleBuilder } from "./SaleBuilder";
@@ -30,7 +31,9 @@ export function SaleEditorLayout({
   isSearching, 
   searchQuery, 
   onSearch, 
-  onPaginate 
+  onPaginate,
+  initialSaleType,
+  initialCollections
 }) {
   const shopify = useAppBridge();
   const submit = useSubmit();
@@ -40,6 +43,8 @@ export function SaleEditorLayout({
   const [saleName, setSaleName] = useState(initialSaleName || "");
   const [startAt, setStartAt] = useState(initialStartAt || "");
   const [endAt, setEndAt] = useState(initialEndAt || "");
+  const [saleType, setSaleType] = useState(initialSaleType || "PRODUCT");
+  
   const [selectedProducts, setSelectedProducts] = useState(() => {
     const grouped = {};
     for (const p of initialProducts || []) {
@@ -62,12 +67,21 @@ export function SaleEditorLayout({
     }
     return Object.values(grouped);
   });
+
+  const [selectedCollections, setSelectedCollections] = useState(initialCollections || []);
+
   const [queryValue, setQueryValue] = useState(searchQuery || "");
 
   useEffect(() => { setQueryValue(searchQuery || ""); }, [searchQuery]);
 
-  const handleSearchClick = () => onSearch(queryValue);
+  const handleSearchClick = () => onSearch(queryValue, saleType);
   const handleKeyDown = (e) => { if (e.key === "Enter") handleSearchClick(); };
+
+  const handleSaleTypeChange = (newType) => {
+    setSaleType(newType);
+    setQueryValue("");
+    onSearch("", newType);
+  };
 
   const handleAddProduct = (product) => {
     if (!isEditable) return;
@@ -110,14 +124,43 @@ export function SaleEditorLayout({
     shopify.toast.show(`Added product with ${variants.length} variant(s) to sale`);
   };
 
-  const handleUpdateSalePrice = (id, newPrice) => {
+  const handleAddCollection = (collection) => {
     if (!isEditable) return;
-    setSelectedProducts(prev => prev.map(p => p.id === id ? { ...p, salePrice: newPrice } : p));
+
+    const exists = selectedCollections.find(c => c.collectionId === collection.id);
+    if (exists) {
+      shopify.toast.show("Collection is already in the sale", { isError: true });
+      return;
+    }
+
+    const newItem = {
+      id: collection.id,
+      collectionId: collection.id,
+      collectionTitle: collection.title,
+      salePrice: 0,
+      imageUrl: collection.image?.url
+    };
+
+    setSelectedCollections(prev => [...prev, newItem]);
+    shopify.toast.show(`Added collection to sale`);
   };
 
-  const handleRemoveProduct = (id) => {
+  const handleUpdateSalePrice = (id, newPrice) => {
     if (!isEditable) return;
-    setSelectedProducts(prev => prev.filter(p => p.id !== id));
+    if (saleType === "PRODUCT") {
+      setSelectedProducts(prev => prev.map(p => p.id === id ? { ...p, salePrice: newPrice } : p));
+    } else {
+      setSelectedCollections(prev => prev.map(c => c.id === id ? { ...c, salePrice: newPrice } : c));
+    }
+  };
+
+  const handleRemoveItem = (id) => {
+    if (!isEditable) return;
+    if (saleType === "PRODUCT") {
+      setSelectedProducts(prev => prev.filter(p => p.id !== id));
+    } else {
+      setSelectedCollections(prev => prev.filter(c => c.id !== id));
+    }
   };
 
   const handleSaveSale = () => {
@@ -126,8 +169,13 @@ export function SaleEditorLayout({
       return;
     }
     
-    if (selectedProducts.length === 0) {
+    if (saleType === "PRODUCT" && selectedProducts.length === 0) {
       shopify.toast.show("At least one product is required", { isError: true });
+      return;
+    }
+
+    if (saleType === "COLLECTION" && selectedCollections.length === 0) {
+      shopify.toast.show("At least one collection is required", { isError: true });
       return;
     }
 
@@ -148,19 +196,29 @@ export function SaleEditorLayout({
     const formData = new FormData();
     formData.append("intent", "save");
     formData.append("saleName", saleName);
+    formData.append("saleType", saleType);
     if (startAt) formData.append("startAt", new Date(startAt).toISOString());
     if (endAt) formData.append("endAt", new Date(endAt).toISOString());
     
-    const flatProducts = [];
-    for (const p of selectedProducts) {
-      for (const v of p.variants) {
-        flatProducts.push({
-          ...v,
-          salePrice: p.salePrice
-        });
+    if (saleType === "PRODUCT") {
+      const flatProducts = [];
+      for (const p of selectedProducts) {
+        for (const v of p.variants) {
+          flatProducts.push({
+            ...v,
+            salePrice: p.salePrice
+          });
+        }
       }
+      formData.append("products", JSON.stringify(flatProducts));
+    } else {
+      const collectionsData = selectedCollections.map(c => ({
+        collectionId: c.collectionId,
+        collectionTitle: c.collectionTitle,
+        salePrice: Number(c.salePrice) || 0
+      }));
+      formData.append("collections", JSON.stringify(collectionsData));
     }
-    formData.append("products", JSON.stringify(flatProducts));
     
     submit(formData, { method: "POST" });
   };
@@ -204,6 +262,24 @@ export function SaleEditorLayout({
                     disabled={!isEditable}
                     autoComplete="off"
                   />
+
+                  {(!initialSaleName) && (
+                    <Select
+                      label="Sale Type"
+                      options={[
+                        {label: 'Product Sale', value: 'PRODUCT'},
+                        {label: 'Collection Sale', value: 'COLLECTION'}
+                      ]}
+                      value={saleType}
+                      onChange={handleSaleTypeChange}
+                      disabled={!isEditable}
+                    />
+                  )}
+                  {initialSaleName && (
+                    <Text as="p">
+                      <strong>Sale Type:</strong> {saleType === "PRODUCT" ? "Product Sale" : "Collection Sale"}
+                    </Text>
+                  )}
                   
                   <FormLayout.Group>
                     <TextField 
@@ -232,17 +308,63 @@ export function SaleEditorLayout({
             </Card>
 
             <BlockStack gap="200">
-              <Text variant="headingMd" as="h2">Sale Builder</Text>
-              <SaleBuilder 
-                products={selectedProducts} 
-                onUpdateProduct={handleUpdateSalePrice} 
-                onRemoveProduct={handleRemoveProduct} 
-              />
+              <Text variant="headingMd" as="h2">{saleType === "PRODUCT" ? "Sale Builder" : "Selected Collections"}</Text>
+              
+              {saleType === "PRODUCT" ? (
+                <SaleBuilder 
+                  products={selectedProducts} 
+                  onUpdateProduct={handleUpdateSalePrice} 
+                  onRemoveProduct={handleRemoveItem} 
+                />
+              ) : (
+                <Card padding="0">
+                  <IndexTable
+                    resourceName={{ singular: 'collection', plural: 'collections' }}
+                    itemCount={selectedCollections.length}
+                    selectable={false}
+                    headings={[
+                      { title: 'Collection' },
+                      { title: 'Sale Price ($)' },
+                      { title: 'Action' }
+                    ]}
+                  >
+                    {selectedCollections.map((col, index) => (
+                      <IndexTable.Row id={col.id} key={col.id} position={index}>
+                        <IndexTable.Cell>
+                          <InlineStack gap="300" blockAlign="center">
+                            <Thumbnail
+                              source={col.imageUrl || ""}
+                              alt={col.collectionTitle}
+                              size="small"
+                            />
+                            <Text variant="bodyMd" fontWeight="bold" as="span">{col.collectionTitle}</Text>
+                          </InlineStack>
+                        </IndexTable.Cell>
+                        <IndexTable.Cell>
+                          <TextField
+                            type="number"
+                            value={col.salePrice.toString()}
+                            onChange={(val) => handleUpdateSalePrice(col.id, val)}
+                            disabled={!isEditable}
+                            autoComplete="off"
+                            prefix="$"
+                          />
+                        </IndexTable.Cell>
+                        <IndexTable.Cell>
+                          <Button tone="critical" onClick={() => handleRemoveItem(col.id)} disabled={!isEditable} size="micro">
+                            Remove
+                          </Button>
+                        </IndexTable.Cell>
+                      </IndexTable.Row>
+                    ))}
+                  </IndexTable>
+                </Card>
+              )}
             </BlockStack>
 
             {isEditable && (
               <BlockStack gap="200">
-                <Text variant="headingMd" as="h2">Search Products to Add</Text>
+                <Text variant="headingMd" as="h2">Search {saleType === "PRODUCT" ? "Products" : "Collections"} to Add</Text>
                 <Card padding="0">
                   <div style={{ padding: '16px' }}>
                     <form onSubmit={(e) => { e.preventDefault(); handleSearchClick(); }}>
@@ -251,7 +373,7 @@ export function SaleEditorLayout({
                           <TextField 
                             value={queryValue}
                             onChange={setQueryValue}
-                            placeholder="Search products by title or SKU"
+                            placeholder={`Search ${saleType === "PRODUCT" ? "products by title or SKU" : "collections by title"}`}
                             autoComplete="off"
                             disabled={isSearching}
                             prefix={<SearchIcon />}
@@ -265,10 +387,10 @@ export function SaleEditorLayout({
                   </div>
                   
                   <IndexTable
-                    resourceName={{ singular: 'product', plural: 'products' }}
+                    resourceName={{ singular: saleType === "PRODUCT" ? 'product' : 'collection', plural: saleType === "PRODUCT" ? 'products' : 'collections' }}
                     itemCount={nodes.length}
                     selectable={false}
-                    headings={[
+                    headings={saleType === "PRODUCT" ? [
                       { title: 'Image' },
                       { title: 'Product' },
                       { title: 'Status' },
@@ -276,11 +398,15 @@ export function SaleEditorLayout({
                       { title: 'Compare at Price' },
                       { title: 'Current Price' },
                       { title: 'Action' }
+                    ] : [
+                      { title: 'Image' },
+                      { title: 'Collection' },
+                      { title: 'Action' }
                     ]}
                   >
                     {isSearching && nodes.length === 0 ? (
                       <IndexTable.Row>
-                        <IndexTable.Cell colSpan={7}>
+                        <IndexTable.Cell colSpan={saleType === "PRODUCT" ? 7 : 3}>
                           <div style={{ padding: '32px', textAlign: 'center' }}>
                             <Text>Loading...</Text>
                           </div>
@@ -288,52 +414,75 @@ export function SaleEditorLayout({
                       </IndexTable.Row>
                     ) : !searchError && nodes.length === 0 ? (
                       <IndexTable.Row>
-                        <IndexTable.Cell colSpan={7}>
+                        <IndexTable.Cell colSpan={saleType === "PRODUCT" ? 7 : 3}>
                           <div style={{ padding: '32px', textAlign: 'center' }}>
-                            <Text tone="subdued">No products found.</Text>
+                            <Text tone="subdued">No {saleType === "PRODUCT" ? "products" : "collections"} found.</Text>
                           </div>
                         </IndexTable.Cell>
                       </IndexTable.Row>
                     ) : (
-                      nodes.map((product, index) => {
-                        const variant = product.variants?.nodes?.[0];
-                        const imageUrl = product.featuredImage?.url;
-                        
-                        return (
-                          <IndexTable.Row id={product.id} key={product.id} position={index}>
-                            <IndexTable.Cell>
-                              <Thumbnail
-                                source={imageUrl || ""}
-                                alt={product.title}
-                                size="small"
-                              />
-                            </IndexTable.Cell>
-                            <IndexTable.Cell>
-                              <Text variant="bodyMd" fontWeight="bold" as="span">{product.title}</Text>
-                            </IndexTable.Cell>
-                            <IndexTable.Cell>
-                              <Badge tone={product.status === 'ACTIVE' ? "success" : undefined}>
-                                {product.status || '-'}
-                              </Badge>
-                            </IndexTable.Cell>
-                            <IndexTable.Cell>
-                              <Text as="span">{variant?.sku || '-'}</Text>
-                            </IndexTable.Cell>
-                            <IndexTable.Cell>
-                              <Text tone={variant?.compareAtPrice ? "subdued" : "base"} textDecorationLine={variant?.compareAtPrice ? "line-through" : "none"}>
-                                {variant?.compareAtPrice ? `$${variant.compareAtPrice}` : '-'}
-                              </Text>
-                            </IndexTable.Cell>
-                            <IndexTable.Cell>
-                              <Text as="span">{variant?.price ? `$${variant.price}` : '-'}</Text>
-                            </IndexTable.Cell>
-                            <IndexTable.Cell>
-                              <Button onClick={() => handleAddProduct(product)} disabled={isSearching} size="micro">
-                                Add to Sale
-                              </Button>
-                            </IndexTable.Cell>
-                          </IndexTable.Row>
-                        );
+                      nodes.map((item, index) => {
+                        if (saleType === "PRODUCT") {
+                          const variant = item.variants?.nodes?.[0];
+                          const imageUrl = item.featuredImage?.url;
+                          
+                          return (
+                            <IndexTable.Row id={item.id} key={item.id} position={index}>
+                              <IndexTable.Cell>
+                                <Thumbnail
+                                  source={imageUrl || ""}
+                                  alt={item.title}
+                                  size="small"
+                                />
+                              </IndexTable.Cell>
+                              <IndexTable.Cell>
+                                <Text variant="bodyMd" fontWeight="bold" as="span">{item.title}</Text>
+                              </IndexTable.Cell>
+                              <IndexTable.Cell>
+                                <Badge tone={item.status === 'ACTIVE' ? "success" : undefined}>
+                                  {item.status || '-'}
+                                </Badge>
+                              </IndexTable.Cell>
+                              <IndexTable.Cell>
+                                <Text as="span">{variant?.sku || '-'}</Text>
+                              </IndexTable.Cell>
+                              <IndexTable.Cell>
+                                <Text tone={variant?.compareAtPrice ? "subdued" : "base"} textDecorationLine={variant?.compareAtPrice ? "line-through" : "none"}>
+                                  {variant?.compareAtPrice ? `$${variant.compareAtPrice}` : '-'}
+                                </Text>
+                              </IndexTable.Cell>
+                              <IndexTable.Cell>
+                                <Text as="span">{variant?.price ? `$${variant.price}` : '-'}</Text>
+                              </IndexTable.Cell>
+                              <IndexTable.Cell>
+                                <Button onClick={() => handleAddProduct(item)} disabled={isSearching} size="micro">
+                                  Add to Sale
+                                </Button>
+                              </IndexTable.Cell>
+                            </IndexTable.Row>
+                          );
+                        } else {
+                          const imageUrl = item.image?.url;
+                          return (
+                            <IndexTable.Row id={item.id} key={item.id} position={index}>
+                              <IndexTable.Cell>
+                                <Thumbnail
+                                  source={imageUrl || ""}
+                                  alt={item.title}
+                                  size="small"
+                                />
+                              </IndexTable.Cell>
+                              <IndexTable.Cell>
+                                <Text variant="bodyMd" fontWeight="bold" as="span">{item.title}</Text>
+                              </IndexTable.Cell>
+                              <IndexTable.Cell>
+                                <Button onClick={() => handleAddCollection(item)} disabled={isSearching} size="micro">
+                                  Add to Sale
+                                </Button>
+                              </IndexTable.Cell>
+                            </IndexTable.Row>
+                          );
+                        }
                       })
                     )}
                   </IndexTable>

@@ -43,6 +43,10 @@ model Sale {
   scheduledAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  saleType    String   @default("PRODUCT")
+  collectionId String?
+  collectionTitle String?
+  collections Json?
   items       SaleItem[]
 }
 
