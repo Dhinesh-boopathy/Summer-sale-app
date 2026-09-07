@@ -1,4 +1,4 @@
-import { Page, Button, InlineStack, BlockStack, Text } from "@shopify/polaris";
+import { Button, InlineStack, BlockStack, Text } from "@shopify/polaris";
 import { PlusIcon, RefreshIcon } from "@shopify/polaris-icons";
 import { useNavigate } from "react-router";
 

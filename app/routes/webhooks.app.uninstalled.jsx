@@ -11,23 +11,23 @@ export const action = async ({ request }) => {
   // If this webhook already ran, the session may have been deleted previously.
   if (session) {
     try {
-      // Find all active running sales for this shop
-      const runningSales = await db.sale.findMany({
+      // Restore any sale that may already have changed a product price.
+      const activeSales = await db.sale.findMany({
         where: {
           shop: shop,
-          status: "Running"
+          status: { in: ["Starting", "Running", "Ending"] }
         },
         include: { items: true }
       });
 
-      if (runningSales.length > 0 && admin) {
-        console.log(`Found ${runningSales.length} active sales for ${shop} during uninstall. Attempting to revert prices.`);
+      if (activeSales.length > 0 && admin) {
+        console.log(`Found ${activeSales.length} active sales for ${shop} during uninstall. Attempting to revert prices.`);
         
-        for (const sale of runningSales) {
+        for (const sale of activeSales) {
           const groupedByProduct = {};
           
           for (const item of sale.items) {
-            if (!item.variantId || !item.productId) continue;
+            if (!item.appliedAt || !item.variantId || !item.productId) continue;
             if (!groupedByProduct[item.productId]) {
               groupedByProduct[item.productId] = [];
             }
@@ -58,9 +58,11 @@ export const action = async ({ request }) => {
       console.error(`Error during uninstall cleanup for ${shop}:`, error);
     }
 
-    // Safely delete the session only AFTER reverting active sales
-    await db.session.deleteMany({ where: { shop } });
   }
+
+  // A duplicate webhook can arrive after the session is gone; data deletion must still be idempotent.
+  await db.sale.deleteMany({ where: { shop } });
+  await db.session.deleteMany({ where: { shop } });
 
   return new Response();
 };

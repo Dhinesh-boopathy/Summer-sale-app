@@ -75,8 +75,6 @@ export function SaleEditorLayout({
   useEffect(() => { setQueryValue(searchQuery || ""); }, [searchQuery]);
 
   const handleSearchClick = () => onSearch(queryValue, saleType);
-  const handleKeyDown = (e) => { if (e.key === "Enter") handleSearchClick(); };
-
   const handleSaleTypeChange = (newType) => {
     setSaleType(newType);
     setQueryValue("");

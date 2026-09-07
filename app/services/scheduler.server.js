@@ -13,156 +13,109 @@ cron.schedule("* * * * *", async () => {
   }
 });
 
+const salePriceForItem = (item) => item.salePrice;
+const originalPriceForItem = (item) => item.originalPrice;
+const SHOPIFY_MUTATION_DELAY_MS = 250;
+
+function groupItemsByProduct(items, priceForItem, isStarting) {
+  return items.reduce((groups, item) => {
+    if (!item.variantId || !item.productId) return groups;
+    groups[item.productId] ||= [];
+    groups[item.productId].push({
+      id: item.variantId,
+      price: priceForItem(item).toString(),
+      compareAtPrice: isStarting ? item.originalPrice.toString() : null,
+      dbId: item.id,
+    });
+    return groups;
+  }, {});
+}
+
+async function updateGroups(client, groups, timestampField) {
+  let failed = false;
+  for (const [productId, variants] of Object.entries(groups)) {
+    try {
+      await applyProductVariantsPrice(client, productId, variants.map(({ id, price, compareAtPrice }) => ({ id, price, compareAtPrice })));
+      await prisma.saleItem.updateMany({
+        where: { id: { in: variants.map((variant) => variant.dbId) } },
+        data: { [timestampField]: new Date() },
+      });
+    } catch (error) {
+      failed = true;
+      console.error(`Failed to update product ${productId}:`, error.message || error);
+    } finally {
+      // Keep mutation throughput below Shopify's restore rate to avoid throttling.
+      await new Promise((resolve) => setTimeout(resolve, SHOPIFY_MUTATION_DELAY_MS));
+    }
+  }
+  return failed;
+}
+
 async function processScheduledSales() {
-  const now = new Date();
-  const scheduledSales = await prisma.sale.findMany({
-    where: {
-      status: "Scheduled",
-      startAt: { lte: now }
-    },
-    include: { items: true }
+  const salesToStart = await prisma.sale.findMany({
+    where: { status: { in: ["Scheduled", "Starting"] }, startAt: { lte: new Date() } },
+    include: { items: { where: { appliedAt: null } } },
   });
 
-  for (const sale of scheduledSales) {
-    console.log(`Starting scheduled sale: ${sale.name} (${sale.id})`);
-    
-    await prisma.sale.update({
-      where: { id: sale.id },
-      data: { status: "Starting" }
-    });
-    
-    try {
-      const client = await getOfflineGraphqlClient(sale.shop);
-      let successCount = 0;
-
-      const groupedByProduct = {};
-      for (const item of sale.items) {
-        if (!item.variantId || !item.productId) continue;
-        if (!groupedByProduct[item.productId]) {
-          groupedByProduct[item.productId] = [];
-        }
-        groupedByProduct[item.productId].push({
-          id: item.variantId,
-          price: item.salePrice.toString(),
-          compareAtPrice: item.originalPrice.toString(),
-          _dbId: item.id
-        });
-      }
-
-      for (const [productId, variants] of Object.entries(groupedByProduct)) {
-        try {
-          const shopifyVariants = variants.map(v => ({ id: v.id, price: v.price, compareAtPrice: v.compareAtPrice }));
-          await applyProductVariantsPrice(client, productId, shopifyVariants);
-          
-          const dbIds = variants.map(v => v._dbId);
-          await prisma.saleItem.updateMany({
-            where: { id: { in: dbIds } },
-            data: { appliedAt: new Date() }
-          });
-          
-          successCount += variants.length;
-        } catch (itemError) {
-          console.error(`Failed to apply sale price for product ${productId}:`, itemError.message || itemError);
-        }
-      }
-
-      if (successCount > 0 || sale.items.length === 0) {
-        await prisma.sale.update({
-          where: { id: sale.id },
-          data: { status: "Running" }
-        });
-        console.log(`Sale ${sale.name} is now RUNNING. Applied prices to ${successCount} items.`);
-      } else {
-        await prisma.sale.update({
-          where: { id: sale.id },
-          data: { status: "Failed" }
-        });
-        console.log(`Sale ${sale.name} FAILED to start. Applied prices to 0 items.`);
-      }
-
-    } catch (saleError) {
-      console.error(`Failed to start sale ${sale.name}:`, saleError.message || saleError);
-      await prisma.sale.update({
-        where: { id: sale.id },
-        data: { status: "Failed" }
+  for (const sale of salesToStart) {
+    if (sale.status === "Scheduled") {
+      const claimed = await prisma.sale.updateMany({
+        where: { id: sale.id, status: "Scheduled" },
+        data: { status: "Starting" },
       });
+      if (claimed.count === 0) continue;
+    }
+
+    try {
+      if (sale.items.length > 0) {
+        const client = await getOfflineGraphqlClient(sale.shop);
+        const failed = await updateGroups(client, groupItemsByProduct(sale.items, salePriceForItem, true), "appliedAt");
+        if (failed) continue;
+      }
+
+      const remainingItems = await prisma.saleItem.count({ where: { saleId: sale.id, appliedAt: null } });
+      if (remainingItems === 0) {
+        await prisma.sale.updateMany({ where: { id: sale.id, status: "Starting" }, data: { status: "Running" } });
+      }
+    } catch (error) {
+      // Preserve Starting so a restart or transient error resumes only unapplied items.
+      console.error(`Failed to start sale ${sale.name}:`, error.message || error);
     }
   }
 }
 
 async function processRunningSales() {
-  const now = new Date();
-  const runningSales = await prisma.sale.findMany({
-    where: {
-      status: "Running",
-      endAt: { lte: now }
-    },
-    include: { items: true }
+  const salesToEnd = await prisma.sale.findMany({
+    where: { status: { in: ["Running", "Ending"] }, endAt: { lte: new Date() } },
+    include: { items: { where: { appliedAt: { not: null }, restoredAt: null } } },
   });
 
-  for (const sale of runningSales) {
-    console.log(`Ending running sale: ${sale.name} (${sale.id})`);
-    
-    await prisma.sale.update({
-      where: { id: sale.id },
-      data: { status: "Ending" }
-    });
-    
-    try {
-      const client = await getOfflineGraphqlClient(sale.shop);
-      let successCount = 0;
-
-      const groupedByProduct = {};
-      for (const item of sale.items) {
-        if (!item.variantId || !item.productId) continue;
-        if (!groupedByProduct[item.productId]) {
-          groupedByProduct[item.productId] = [];
-        }
-        groupedByProduct[item.productId].push({
-          id: item.variantId,
-          price: item.originalPrice.toString(),
-          compareAtPrice: null,
-          _dbId: item.id
-        });
-      }
-
-      for (const [productId, variants] of Object.entries(groupedByProduct)) {
-        try {
-          const shopifyVariants = variants.map(v => ({ id: v.id, price: v.price, compareAtPrice: v.compareAtPrice }));
-          await applyProductVariantsPrice(client, productId, shopifyVariants);
-          
-          const dbIds = variants.map(v => v._dbId);
-          await prisma.saleItem.updateMany({
-            where: { id: { in: dbIds } },
-            data: { restoredAt: new Date() }
-          });
-          
-          successCount += variants.length;
-        } catch (itemError) {
-          console.error(`Failed to restore price for product ${productId}:`, itemError.message || itemError);
-        }
-      }
-
-      if (successCount > 0 || sale.items.length === 0) {
-        await prisma.sale.update({
-          where: { id: sale.id },
-          data: { status: "Completed" }
-        });
-        console.log(`Sale ${sale.name} is now COMPLETED. Restored prices for ${successCount} items.`);
-      } else {
-        await prisma.sale.update({
-          where: { id: sale.id },
-          data: { status: "Failed" }
-        });
-        console.log(`Sale ${sale.name} FAILED to end properly. Restored prices for 0 items.`);
-      }
-
-    } catch (saleError) {
-      console.error(`Failed to end sale ${sale.name}:`, saleError.message || saleError);
-      await prisma.sale.update({
-        where: { id: sale.id },
-        data: { status: "Failed" }
+  for (const sale of salesToEnd) {
+    if (sale.status === "Running") {
+      const claimed = await prisma.sale.updateMany({
+        where: { id: sale.id, status: "Running" },
+        data: { status: "Ending" },
       });
+      if (claimed.count === 0) continue;
+    }
+
+    try {
+      // Restore only variants whose sale price was recorded as successfully applied.
+      if (sale.items.length > 0) {
+        const client = await getOfflineGraphqlClient(sale.shop);
+        const failed = await updateGroups(client, groupItemsByProduct(sale.items, originalPriceForItem, false), "restoredAt");
+        if (failed) continue;
+      }
+
+      const remainingItems = await prisma.saleItem.count({
+        where: { saleId: sale.id, appliedAt: { not: null }, restoredAt: null },
+      });
+      if (remainingItems === 0) {
+        await prisma.sale.updateMany({ where: { id: sale.id, status: "Ending" }, data: { status: "Completed" } });
+      }
+    } catch (error) {
+      // Preserve Ending so a restart or transient error retries the remaining restores.
+      console.error(`Failed to end sale ${sale.name}:`, error.message || error);
     }
   }
 }

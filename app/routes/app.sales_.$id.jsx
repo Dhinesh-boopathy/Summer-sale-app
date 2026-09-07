@@ -6,8 +6,8 @@ import { SaleEditorLayout } from "../components/sales/SaleEditorLayout";
 import { useLoaderData, useNavigation, useSubmit, redirect } from "react-router";
 
 export const loader = async ({ request, params }) => {
-  const { admin } = await authenticate.admin(request);
-  const sale = await getSale(params.id);
+  const { admin, session } = await authenticate.admin(request);
+  const sale = await getSale(session.shop, params.id);
   
   if (!sale) {
     throw new Response("Not Found", { status: 404 });
@@ -34,7 +34,7 @@ export const loader = async ({ request, params }) => {
 };
 
 export const action = async ({ request, params }) => {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const formData = await request.formData();
   
   if (formData.get("intent") === "save") {
@@ -65,7 +65,7 @@ export const action = async ({ request, params }) => {
       itemsToSave = Array.from(variantsMap.values());
     }
     
-    await updateSale(params.id, {
+    await updateSale(session.shop, params.id, {
       name: saleName,
       saleType: saleType,
       collections: collectionsJson,

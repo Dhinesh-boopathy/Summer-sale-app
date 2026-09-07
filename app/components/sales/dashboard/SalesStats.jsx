@@ -1,4 +1,4 @@
-import { Card, Text, BlockStack, InlineGrid, Box } from "@shopify/polaris";
+import { Card, Text, BlockStack, InlineGrid } from "@shopify/polaris";
 
 export function SalesStats({ sales }) {
   const total = sales.length;

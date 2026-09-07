@@ -12,7 +12,7 @@ export const loader = async ({ request }) => {
   let sales = [];
   let dbError = false;
   try {
-    sales = await listSales();
+    sales = await listSales(session.shop);
   } catch (error) {
     console.error("Failed to fetch sales from database:", error.message || error);
     dbError = true;

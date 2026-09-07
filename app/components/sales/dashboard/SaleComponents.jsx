@@ -124,20 +124,11 @@ export function ActionMenu({ sale }) {
             content: 'Edit Details',
             onAction: () => navigate(`/app/sales/${sale.id}`),
           },
-          {
-            content: 'Duplicate',
-            onAction: () => shopify.toast.show("Coming soon"),
-          },
-          {
-            content: sale.status === 'Running' ? 'Pause' : 'Resume',
-            onAction: () => shopify.toast.show("Coming soon"),
-            disabled: sale.status !== 'Running' && sale.status !== 'Paused',
-          },
-          {
-            content: 'Delete',
+          ...(sale.status === "Draft" || sale.status === "Scheduled" ? [{
+            content: "Delete",
             destructive: true,
             onAction: handleDelete,
-          },
+          }] : []),
         ]}
       />
     </Popover>

@@ -5,21 +5,21 @@ import { SalesDashboardLayout } from "../components/sales/dashboard/SalesDashboa
 import { useLoaderData } from "react-router";
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const url = new URL(request.url);
   const q = url.searchParams.get("q") || "";
-  const sales = await listSales(q);
+  const sales = await listSales(session.shop, q);
   return { sales, q };
 };
 
 export const action = async ({ request }) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = formData.get("intent");
   
   if (intent === "delete") {
     const id = formData.get("id");
-    await deleteSale(id);
+    await deleteSale(session.shop, id);
     return { success: true };
   }
   return null;

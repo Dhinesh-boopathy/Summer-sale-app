@@ -1,11 +1,15 @@
 import { authenticate } from "../shopify.server";
+import db from "../db.server";
 
 export const action = async ({ request }) => {
-  const { topic, shop, session, admin } = await authenticate.webhook(request);
+  const { topic, shop } = await authenticate.webhook(request);
   console.log(`Received ${topic} webhook for ${shop}`);
-  
-  // The app doesn't store any shop PII, only standard shop settings,
-  // which are deleted when the shop uninstalls the app anyway.
+
+  // Sale items are removed by the cascade relation when their sale is deleted.
+  await db.$transaction([
+    db.sale.deleteMany({ where: { shop } }),
+    db.session.deleteMany({ where: { shop } }),
+  ]);
   
   return new Response();
 };

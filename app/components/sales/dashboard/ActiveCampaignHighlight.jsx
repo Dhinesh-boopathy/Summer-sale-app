@@ -1,4 +1,4 @@
-import { Card, Text, BlockStack, InlineStack, ProgressBar, Badge, Box } from "@shopify/polaris";
+import { Card, Text, BlockStack, InlineStack, ProgressBar, Badge } from "@shopify/polaris";
 
 export function ActiveCampaignHighlight({ sales }) {
   const activeSales = sales.filter(s => s.status === "Running");
