@@ -25,7 +25,7 @@ export async function searchProducts(admin, { query, cursor, direction = 'next',
             url
             altText
           }
-          variants(first: 100) {
+          variants(first: 250) {
             nodes {
               id
               title
@@ -126,7 +126,11 @@ export async function getCollectionVariants(admin, collectionId) {
             featuredImage {
               url
             }
-            variants(first: 100) {
+            variants(first: 250) {
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
               nodes {
                 id
                 title

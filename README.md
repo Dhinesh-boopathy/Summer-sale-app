@@ -1,5 +1,31 @@
 # Shopify App Template - React Router
 
+## Production operations
+
+This app has two processes in production: the web process (`npm run start`) and
+the scheduled-sale worker (`npm run start:worker`). Run exactly one worker
+instance. The worker uses a database lease so a temporary overlap cannot process
+the same sales twice.
+
+For a new database, deploy the included Prisma migrations with:
+
+```shell
+npm run migrate:deploy
+```
+
+This project previously used `prisma db push`. If the production database already
+contains these tables, take a backup and baseline it once before deploying this
+version:
+
+```shell
+npx prisma migrate resolve --applied 20260907000000_initial_schema
+npm run migrate:deploy
+```
+
+Do not run the baseline command against a new database. Store production secrets
+in the host's secret manager, and configure `SHOPIFY_APP_URL`,
+`SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, `SCOPES`, and `DATABASE_URL` there.
+
 This is a template for building a [Shopify app](https://shopify.dev/docs/apps/getting-started) using [React Router](https://reactrouter.com/). It was forked from the [Shopify Remix app template](https://github.com/Shopify/shopify-app-template-remix) and converted to React Router.
 
 Rather than cloning this repo, follow the [Quick Start steps](https://github.com/Shopify/shopify-app-template-react-router#quick-start).

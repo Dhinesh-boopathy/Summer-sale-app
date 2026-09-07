@@ -35,7 +35,7 @@ export function SaleStatusBadge({ status }) {
 }
 
 export function SaleProgress({ sale }) {
-  const { status, startAt, endAt } = sale;
+  const { status, startAt, endAt, failureReason } = sale;
   const now = new Date();
   
   if (status === "Draft") {
@@ -49,6 +49,10 @@ export function SaleProgress({ sale }) {
         <Text as="span" variant="bodySm" tone="subdued">Finished</Text>
       </BlockStack>
     );
+  }
+
+  if (status === "Failed") {
+    return <Text as="span" tone="critical">{failureReason || "Needs attention"}</Text>;
   }
   
   if (status === "Scheduled" && startAt) {

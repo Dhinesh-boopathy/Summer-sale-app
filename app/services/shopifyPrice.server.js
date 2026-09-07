@@ -55,6 +55,21 @@ export async function applyVariantPrice(admin, productId, variantId, newPrice) {
   ]);
 }
 
+export async function getProductVariantPrices(admin, variantIds) {
+  const response = await admin.graphql(`#graphql
+    query ProductVariantPrices($ids: [ID!]!) {
+      nodes(ids: $ids) {
+        ... on ProductVariant { id price compareAtPrice }
+      }
+    }
+  `, { variables: { ids: variantIds } });
+  const json = await response.json();
+  if (json.errors) throw new Error(json.errors.map((error) => error.message).join(", "));
+
+  const variants = (json.data?.nodes || []).filter(Boolean);
+  return new Map(variants.map((variant) => [variant.id, variant]));
+}
+
 export async function restoreVariantPrice(admin, productId, variantId, originalPrice) {
   return applyVariantPrice(admin, productId, variantId, originalPrice);
 }

@@ -1,21 +1,11 @@
-import cron from "node-cron";
 import prisma from "../db.server";
-import { getOfflineGraphqlClient, applyProductVariantsPrice } from "./shopifyPrice.server";
-
-console.log("Scheduler initializing...");
-
-cron.schedule("* * * * *", async () => {
-  try {
-    await processScheduledSales();
-    await processRunningSales();
-  } catch (error) {
-    console.error("Scheduler encountered a critical error:", error);
-  }
-});
+import { getOfflineGraphqlClient, applyProductVariantsPrice, getProductVariantPrices } from "./shopifyPrice.server";
 
 const salePriceForItem = (item) => item.salePrice;
 const originalPriceForItem = (item) => item.originalPrice;
 const SHOPIFY_MUTATION_DELAY_MS = 250;
+const SCHEDULER_LOCK_ID = "sales-scheduler";
+const SCHEDULER_LOCK_MS = 55 * 1000;
 
 function groupItemsByProduct(items, priceForItem, isStarting) {
   return items.reduce((groups, item) => {
@@ -29,6 +19,29 @@ function groupItemsByProduct(items, priceForItem, isStarting) {
     });
     return groups;
   }, {});
+}
+
+function pricesEqual(first, second) {
+  return Number(first).toFixed(4) === Number(second).toFixed(4);
+}
+
+async function verifyExpectedPrices(client, items, expectedPriceForItem) {
+  const groups = groupItemsByProduct(items, expectedPriceForItem, false);
+  for (const variants of Object.values(groups)) {
+    const currentPrices = await getProductVariantPrices(client, variants.map((variant) => variant.id));
+    if (variants.some((variant) => !currentPrices.has(variant.id) || !pricesEqual(currentPrices.get(variant.id).price, variant.price))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+async function failSale(sale, expectedStatus, reason) {
+  await prisma.sale.updateMany({
+    where: { id: sale.id, status: expectedStatus },
+    data: { status: "Failed", failureReason: reason },
+  });
+  console.error(`Sale ${sale.name} requires manual attention: ${reason}`);
 }
 
 async function updateGroups(client, groups, timestampField) {
@@ -51,7 +64,7 @@ async function updateGroups(client, groups, timestampField) {
   return failed;
 }
 
-async function processScheduledSales() {
+export async function processScheduledSales() {
   const salesToStart = await prisma.sale.findMany({
     where: { status: { in: ["Scheduled", "Starting"] }, startAt: { lte: new Date() } },
     include: { items: { where: { appliedAt: null } } },
@@ -69,6 +82,10 @@ async function processScheduledSales() {
     try {
       if (sale.items.length > 0) {
         const client = await getOfflineGraphqlClient(sale.shop);
+        if (!(await verifyExpectedPrices(client, sale.items, originalPriceForItem))) {
+          await failSale(sale, "Starting", "A product price changed after this sale was scheduled. No sale prices were applied.");
+          continue;
+        }
         const failed = await updateGroups(client, groupItemsByProduct(sale.items, salePriceForItem, true), "appliedAt");
         if (failed) continue;
       }
@@ -84,7 +101,7 @@ async function processScheduledSales() {
   }
 }
 
-async function processRunningSales() {
+export async function processRunningSales() {
   const salesToEnd = await prisma.sale.findMany({
     where: { status: { in: ["Running", "Ending"] }, endAt: { lte: new Date() } },
     include: { items: { where: { appliedAt: { not: null }, restoredAt: null } } },
@@ -103,6 +120,10 @@ async function processRunningSales() {
       // Restore only variants whose sale price was recorded as successfully applied.
       if (sale.items.length > 0) {
         const client = await getOfflineGraphqlClient(sale.shop);
+        if (!(await verifyExpectedPrices(client, sale.items, salePriceForItem))) {
+          await failSale(sale, "Ending", "A sale price was changed outside the app, so prices were not restored automatically.");
+          continue;
+        }
         const failed = await updateGroups(client, groupItemsByProduct(sale.items, originalPriceForItem, false), "restoredAt");
         if (failed) continue;
       }
@@ -117,5 +138,39 @@ async function processRunningSales() {
       // Preserve Ending so a restart or transient error retries the remaining restores.
       console.error(`Failed to end sale ${sale.name}:`, error.message || error);
     }
+  }
+}
+
+async function acquireSchedulerLock() {
+  const now = new Date();
+  const lockedUntil = new Date(now.getTime() + SCHEDULER_LOCK_MS);
+  const renewed = await prisma.schedulerLock.updateMany({
+    where: { id: SCHEDULER_LOCK_ID, lockedUntil: { lt: now } },
+    data: { lockedUntil },
+  });
+  if (renewed.count > 0) return true;
+
+  try {
+    await prisma.schedulerLock.create({ data: { id: SCHEDULER_LOCK_ID, lockedUntil } });
+    return true;
+  } catch (error) {
+    // Another worker created or renewed the lock first.
+    if (error?.code === "P2002") return false;
+    throw error;
+  }
+}
+
+export async function runSalesScheduler() {
+  if (!(await acquireSchedulerLock())) return false;
+
+  try {
+    await processScheduledSales();
+    await processRunningSales();
+    return true;
+  } finally {
+    await prisma.schedulerLock.update({
+      where: { id: SCHEDULER_LOCK_ID },
+      data: { lockedUntil: new Date() },
+    });
   }
 }

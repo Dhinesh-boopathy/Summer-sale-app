@@ -41,6 +41,7 @@ model Sale {
   startAt     DateTime?
   endAt       DateTime?
   scheduledAt DateTime?
+  failureReason String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   saleType    String   @default("PRODUCT")
@@ -48,6 +49,9 @@ model Sale {
   collectionTitle String?
   collections Json?
   items       SaleItem[]
+
+  @@index([shop, status, startAt])
+  @@index([shop, status, endAt])
 }
 
 model SaleItem {
@@ -63,4 +67,12 @@ model SaleItem {
   imageUrl      String?
   appliedAt     DateTime?
   restoredAt    DateTime?
+
+  @@index([saleId, appliedAt, restoredAt])
+}
+
+model SchedulerLock {
+  id          String   @id
+  lockedUntil DateTime
+  updatedAt   DateTime @updatedAt
 }
