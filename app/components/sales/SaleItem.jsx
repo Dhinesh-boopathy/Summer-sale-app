@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { IndexTable, Text, TextField, Button, Thumbnail, Badge } from "@shopify/polaris";
 import { DeleteIcon } from "@shopify/polaris-icons";
 
-export function SaleItem({ product, onUpdate, onRemove, index }) {
+export function SaleItem({ product, onUpdate, onRemove, index, currencyCode = "USD" }) {
   const [salePriceStr, setSalePriceStr] = useState(product.salePrice.toString());
   const [error, setError] = useState(null);
 
@@ -60,7 +60,7 @@ export function SaleItem({ product, onUpdate, onRemove, index }) {
         <Text as="span">{product.sku}</Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text as="span">${product.originalPrice.toFixed(2)}</Text>
+        <Text as="span">{new Intl.NumberFormat(undefined, { style: "currency", currency: currencyCode }).format(product.originalPrice)}</Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
         <div style={{ width: '120px' }}>
@@ -73,7 +73,7 @@ export function SaleItem({ product, onUpdate, onRemove, index }) {
             min={0}
             max={product.originalPrice}
             step={0.01}
-            prefix="$"
+            prefix={new Intl.NumberFormat(undefined, { style: "currency", currency: currencyCode }).formatToParts(0).find((part) => part.type === "currency")?.value || currencyCode}
           />
         </div>
       </IndexTable.Cell>

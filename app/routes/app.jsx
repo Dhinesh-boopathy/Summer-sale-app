@@ -9,14 +9,24 @@ import { authenticate } from "../shopify.server";
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
+  const { admin } = await authenticate.admin(request);
+  let currencyCode = "USD";
+  let timeZone = null;
+  try {
+    const response = await admin.graphql(`#graphql query StoreSettings { shop { currencyCode ianaTimezone } }`);
+    const json = await response.json();
+    currencyCode = json.data?.shop?.currencyCode || currencyCode;
+    timeZone = json.data?.shop?.ianaTimezone || null;
+  } catch (error) {
+    console.error("Could not read store currency:", error.message || error);
+  }
 
   // eslint-disable-next-line no-undef
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  return { apiKey: process.env.SHOPIFY_API_KEY || "", currencyCode, timeZone };
 };
 
 export default function App() {
-  const { apiKey } = useLoaderData();
+  const { apiKey, currencyCode, timeZone } = useLoaderData();
 
   return (
     <PolarisAppProvider i18n={polarisTranslations}>
@@ -25,8 +35,9 @@ export default function App() {
           <s-link href="/app">Dashboard</s-link>
           <s-link href="/app/products">Products</s-link>
           <s-link href="/app/sales">Sales</s-link>
+          <s-link href="/app/settings">Settings</s-link>
         </s-app-nav>
-        <Outlet />
+        <Outlet context={{ currencyCode, timeZone }} />
       </AppProvider>
     </PolarisAppProvider>
   );

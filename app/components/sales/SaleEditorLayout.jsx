@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
-import { useSubmit, useNavigation } from "react-router";
+import { useSubmit, useNavigation, useOutletContext } from "react-router";
 import { 
   Page, 
   Layout, 
@@ -19,6 +19,7 @@ import {
 } from "@shopify/polaris";
 import { SearchIcon } from "@shopify/polaris-icons";
 import { SaleBuilder } from "./SaleBuilder";
+import { formatInstantInTimeZone, localDateTimeInTimeZoneToIso } from "../../utils/store-time";
 
 export function SaleEditorLayout({ 
   initialSaleName, 
@@ -33,16 +34,23 @@ export function SaleEditorLayout({
   onSearch, 
   onPaginate,
   initialSaleType,
-  initialCollections
+  initialCollections,
+  actionError,
+  saleStatus,
+  failureReason,
+  plan = "FREE",
+  productLimit = 10
 }) {
+  const { currencyCode = "USD", timeZone } = useOutletContext() || {};
+  const currencySymbol = new Intl.NumberFormat(undefined, { style: "currency", currency: currencyCode }).formatToParts(0).find((part) => part.type === "currency")?.value || currencyCode;
   const shopify = useAppBridge();
   const submit = useSubmit();
   const navigation = useNavigation();
   const isSaving = navigation.state === "submitting" && navigation.formData?.get("intent") === "save";
 
   const [saleName, setSaleName] = useState(initialSaleName || "");
-  const [startAt, setStartAt] = useState(initialStartAt || "");
-  const [endAt, setEndAt] = useState(initialEndAt || "");
+  const [startAt, setStartAt] = useState("");
+  const [endAt, setEndAt] = useState("");
   const [saleType, setSaleType] = useState(initialSaleType || "PRODUCT");
   
   const [selectedProducts, setSelectedProducts] = useState(() => {
@@ -64,6 +72,7 @@ export function SaleEditorLayout({
         grouped[p.productId].sku = 'Multiple SKUs';
       }
       grouped[p.productId].variants.push(p);
+      grouped[p.productId].originalPrice = Math.min(grouped[p.productId].originalPrice, p.originalPrice);
     }
     return Object.values(grouped);
   });
@@ -73,6 +82,11 @@ export function SaleEditorLayout({
   const [queryValue, setQueryValue] = useState(searchQuery || "");
 
   useEffect(() => { setQueryValue(searchQuery || ""); }, [searchQuery]);
+
+  useEffect(() => {
+    setStartAt(formatInstantInTimeZone(initialStartAt, timeZone));
+    setEndAt(formatInstantInTimeZone(initialEndAt, timeZone));
+  }, [initialStartAt, initialEndAt, timeZone]);
 
   const handleSearchClick = () => onSearch(queryValue, saleType);
   const handleSaleTypeChange = (newType) => {
@@ -92,8 +106,14 @@ export function SaleEditorLayout({
       shopify.toast.show("Product is already in the sale", { isError: true });
       return;
     }
+    if (selectedProducts.length >= productLimit) {
+      shopify.toast.show(`Your ${plan} plan allows up to ${productLimit.toLocaleString()} products per sale.`, { isError: true });
+      return;
+    }
 
-    const price = parseFloat(variants[0].price || 0);
+    // This editor applies one sale price to every variant, so it must be
+    // valid for the least expensive variant as well.
+    const price = Math.min(...variants.map((variant) => parseFloat(variant.price || 0)));
 
     const newItem = {
       id: product.id, 
@@ -130,7 +150,6 @@ export function SaleEditorLayout({
       shopify.toast.show("Collection is already in the sale", { isError: true });
       return;
     }
-
     const newItem = {
       id: collection.id,
       collectionId: collection.id,
@@ -146,7 +165,11 @@ export function SaleEditorLayout({
   const handleUpdateSalePrice = (id, newPrice) => {
     if (!isEditable) return;
     if (saleType === "PRODUCT") {
-      setSelectedProducts(prev => prev.map(p => p.id === id ? { ...p, salePrice: newPrice } : p));
+      setSelectedProducts(prev => prev.map(p => p.id === id ? {
+        ...p,
+        salePrice: newPrice,
+        variants: p.variants.map((variant) => ({ ...variant, salePrice: newPrice }))
+      } : p));
     } else {
       setSelectedCollections(prev => prev.map(c => c.id === id ? { ...c, salePrice: newPrice } : c));
     }
@@ -182,10 +205,23 @@ export function SaleEditorLayout({
       return;
     }
 
+    let startIso = null;
+    let endIso = null;
     if (startAt && endAt) {
-      const sDate = new Date(startAt);
-      const eDate = new Date(endAt);
-      if (eDate <= sDate) {
+      try {
+        const originalStartLocal = formatInstantInTimeZone(initialStartAt, timeZone);
+        const originalEndLocal = formatInstantInTimeZone(initialEndAt, timeZone);
+        startIso = initialStartAt && startAt === originalStartLocal
+          ? new Date(initialStartAt).toISOString()
+          : localDateTimeInTimeZoneToIso(startAt, timeZone);
+        endIso = initialEndAt && endAt === originalEndLocal
+          ? new Date(initialEndAt).toISOString()
+          : localDateTimeInTimeZoneToIso(endAt, timeZone);
+      } catch (error) {
+        shopify.toast.show(error.message, { isError: true });
+        return;
+      }
+      if (new Date(endIso) <= new Date(startIso)) {
         shopify.toast.show("End date must be after start date", { isError: true });
         return;
       }
@@ -195,8 +231,8 @@ export function SaleEditorLayout({
     formData.append("intent", "save");
     formData.append("saleName", saleName);
     formData.append("saleType", saleType);
-    if (startAt) formData.append("startAt", new Date(startAt).toISOString());
-    if (endAt) formData.append("endAt", new Date(endAt).toISOString());
+    if (startIso) formData.append("startAt", startIso);
+    if (endIso) formData.append("endAt", endIso);
     
     if (saleType === "PRODUCT") {
       const flatProducts = [];
@@ -241,9 +277,21 @@ export function SaleEditorLayout({
         <Layout.Section>
           <div style={{ paddingBottom: '64px' }}>
             <BlockStack gap="400">
-            {!isEditable && (
+            {actionError && <Banner tone="critical" title="Could not save sale"><p>{actionError}</p></Banner>}
+            <Text tone="subdued" variant="bodySm">
+              Scheduled times use the store time zone ({timeZone || "unavailable"}).
+            </Text>
+            <Banner tone="info" title={`${plan} plan · up to ${productLimit.toLocaleString()} products per sale`}>
+              <p>Product limits count unique Shopify products. Collection sales are checked against the same limit when saved.</p>
+            </Banner>
+            {!isEditable && saleStatus === "Failed" ? (
+              <Banner tone="critical" title="This sale needs attention">
+                <p>{failureReason || "The app could not safely finish every price update."}</p>
+                <p>Prices changed outside this sale were left untouched. Check the affected product prices in Shopify Admin before making further changes.</p>
+              </Banner>
+            ) : !isEditable && (
               <Banner tone="warning">
-                <p>This sale is currently running or completed. Editing is disabled.</p>
+                <p>{saleStatus === "Completed" ? "This sale has ended and its prices were restored." : "This sale is running or being processed. Editing is disabled until processing finishes."}</p>
               </Banner>
             )}
 
@@ -313,6 +361,7 @@ export function SaleEditorLayout({
                   products={selectedProducts} 
                   onUpdateProduct={handleUpdateSalePrice} 
                   onRemoveProduct={handleRemoveItem} 
+                  currencyCode={currencyCode}
                 />
               ) : (
                 <Card padding="0">
@@ -345,7 +394,7 @@ export function SaleEditorLayout({
                             onChange={(val) => handleUpdateSalePrice(col.id, val)}
                             disabled={!isEditable}
                             autoComplete="off"
-                            prefix="$"
+                            prefix={currencySymbol}
                           />
                         </IndexTable.Cell>
                         <IndexTable.Cell>
@@ -450,10 +499,10 @@ export function SaleEditorLayout({
                                 </Text>
                               </IndexTable.Cell>
                               <IndexTable.Cell>
-                                <Text as="span">{variant?.price ? `$${variant.price}` : '-'}</Text>
+                                <Text as="span">{variant?.price ? new Intl.NumberFormat(undefined, { style: "currency", currency: currencyCode }).format(Number(variant.price)) : '-'}</Text>
                               </IndexTable.Cell>
                               <IndexTable.Cell>
-                                <Button onClick={() => handleAddProduct(item)} disabled={isSearching} size="micro">
+                                <Button onClick={() => handleAddProduct(item)} disabled={isSearching || selectedProducts.length >= productLimit} size="micro">
                                   Add to Sale
                                 </Button>
                               </IndexTable.Cell>

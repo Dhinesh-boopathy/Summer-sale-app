@@ -107,10 +107,11 @@ export async function searchCollections(admin, { query, cursor, direction = 'nex
   }
 }
 
-export async function getCollectionVariants(admin, collectionId) {
+export async function getCollectionVariants(admin, collectionId, { maxProducts = Infinity } = {}) {
   let hasNextPage = true;
   let cursor = null;
   const allVariants = [];
+  const seenProducts = new Set();
 
   const graphqlQuery = `#graphql
     query GetCollectionVariants($id: ID!, $after: String) {
@@ -120,7 +121,7 @@ export async function getCollectionVariants(admin, collectionId) {
             hasNextPage
             endCursor
           }
-          nodes {
+      nodes {
             id
             title
             featuredImage {
@@ -156,6 +157,11 @@ export async function getCollectionVariants(admin, collectionId) {
     if (!productsConnection) break;
 
     for (const product of productsConnection.nodes) {
+      if (!seenProducts.has(product.id) && seenProducts.size >= maxProducts) {
+        hasNextPage = false;
+        break;
+      }
+      seenProducts.add(product.id);
       const pTitle = product.title;
       const imageUrl = product.featuredImage?.url;
       const vNodes = product.variants?.nodes || [];

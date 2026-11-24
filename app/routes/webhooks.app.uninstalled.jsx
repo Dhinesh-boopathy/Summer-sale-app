@@ -1,68 +1,65 @@
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
-import { applyProductVariantsPrice } from "../services/shopifyPrice.server";
+import { reconcileSaleItem } from "../services/sale-pricing.server";
 
 export const action = async ({ request }) => {
-  const { shop, session, topic, admin } = await authenticate.webhook(request);
-
+  const { shop, topic, admin } = await authenticate.webhook(request);
   console.log(`Received ${topic} webhook for ${shop}`);
 
-  // Webhook requests can trigger multiple times and after an app has already been uninstalled.
-  // If this webhook already ran, the session may have been deleted previously.
-  if (session) {
-    try {
-      // Restore any sale that may already have changed a product price.
-      const activeSales = await db.sale.findMany({
-        where: {
-          shop: shop,
-          status: { in: ["Starting", "Running", "Ending"] }
+  const activeSales = await db.sale.findMany({
+    where: { shop, status: { in: ["Starting", "Running", "Ending", "Failed"] } },
+    include: { items: { where: { restoreStatus: { not: "RESTORED" } } } },
+  });
+
+  for (const sale of activeSales) {
+    if (!admin) {
+      await db.sale.update({
+        where: { id: sale.id },
+        data: {
+          status: "Failed",
+          failureReason: "Uninstall received without an available Shopify admin client; recovery data was retained.",
         },
-        include: { items: true }
       });
-
-      if (activeSales.length > 0 && admin) {
-        console.log(`Found ${activeSales.length} active sales for ${shop} during uninstall. Attempting to revert prices.`);
-        
-        for (const sale of activeSales) {
-          const groupedByProduct = {};
-          
-          for (const item of sale.items) {
-            if (!item.appliedAt || !item.variantId || !item.productId) continue;
-            if (!groupedByProduct[item.productId]) {
-              groupedByProduct[item.productId] = [];
-            }
-            groupedByProduct[item.productId].push({
-              id: item.variantId,
-              price: item.originalPrice.toString(),
-              compareAtPrice: null
-            });
-          }
-
-          for (const [productId, variants] of Object.entries(groupedByProduct)) {
-            try {
-              // Revert price and clear compareAtPrice
-              await applyProductVariantsPrice(admin, productId, variants);
-            } catch (error) {
-              console.error(`Failed to revert price for product ${productId} during uninstall:`, error.message || error);
-            }
-          }
-
-          // Mark sale as Failed/Aborted
-          await db.sale.update({
-            where: { id: sale.id },
-            data: { status: "Failed" }
-          });
-        }
-      }
-    } catch (error) {
-      console.error(`Error during uninstall cleanup for ${shop}:`, error);
+      continue;
     }
 
+    let unresolved = false;
+    for (const item of sale.items) {
+      try {
+        const result = await reconcileSaleItem(admin, item, "uninstall", db);
+        if (result !== "done") unresolved = true;
+      } catch (error) {
+        unresolved = true;
+        await db.saleItem.update({
+          where: { id: item.id },
+          data: { lastError: `Uninstall restoration could not be confirmed: ${error.message || error}` },
+        });
+      }
+    }
+
+    if (unresolved) {
+      await db.sale.update({
+        where: { id: sale.id },
+        data: {
+          status: "Failed",
+          failureReason: "Uninstall restoration is incomplete; unresolved variant recovery data was retained.",
+        },
+      });
+      console.error(`Sale ${sale.id} for ${shop} has unresolved uninstall restoration.`);
+    } else {
+      await db.sale.update({
+        where: { id: sale.id },
+        data: { status: "Completed", failureReason: null },
+      });
+    }
   }
 
-  // A duplicate webhook can arrive after the session is gone; data deletion must still be idempotent.
-  await db.sale.deleteMany({ where: { shop } });
+  // Delete only sales that cannot contain an unresolved price mutation.
+  await db.sale.deleteMany({
+    where: { shop, status: { in: ["Draft", "Scheduled", "Completed"] } },
+  });
   await db.session.deleteMany({ where: { shop } });
 
   return new Response();
 };
+

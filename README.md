@@ -26,6 +26,51 @@ Do not run the baseline command against a new database. Store production secrets
 in the host's secret manager, and configure `SHOPIFY_APP_URL`,
 `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, `SCOPES`, and `DATABASE_URL` there.
 
+### Production service layout
+
+This app requires PostgreSQL. `prisma/schema.prisma` uses the PostgreSQL
+provider, and the scheduler uses PostgreSQL advisory locks. SQLite is not a
+supported production database for this version.
+
+Deploy two services from the same image and production environment:
+
+1. A web service running `npm run docker-start`. This applies migrations, then
+   starts the React Router server on port 3000.
+2. One always-on background worker running `npm run start:worker`. Configure it
+   with the same `DATABASE_URL`, Shopify credentials, and `SCOPES` as the web
+   service. One worker is the supported operating setup.
+
+Set `SHOPIFY_APP_URL` to the public HTTPS URL of the web service. The Shopify
+Partner app configuration must use that same URL for its application URL, OAuth
+callback, and privacy webhook URLs. Keep secrets in the host's secret store,
+not in the repository. After deployment, check `/health`, install on a
+development store, then verify a draft, a scheduled start, restoration, and
+uninstall behavior before submitting the app for review.
+
+### Before charging merchants
+
+This repository does not implement in-app billing. Configure Shopify App
+Pricing in the Partner Dashboard and add plan access checks before offering paid
+plans. Public App Store distribution also requires Shopify's review and a
+complete listing, support contact, and privacy/compliance details.
+
+### Sale product limits
+
+Sale limits are enforced by the server and count unique Shopify products per
+sale (all variants belonging to a selected product count as one product): Free
+10, Basic 100, Growth 250, and Pro 10,000. For development only, a shop's tier
+can be overridden with the `SHOP_PLAN_OVERRIDES` environment variable, for
+example:
+
+```text
+SHOP_PLAN_OVERRIDES={"example.myshopify.com":"PRO"}
+```
+
+This override is a development/testing hook, not proof of a paid subscription.
+Before charging merchants, replace it with Shopify App Pricing entitlement
+lookup using the Partner Dashboard plan configuration and the Active
+Subscription API. Shops without a verified entitlement default to Free.
+
 This is a template for building a [Shopify app](https://shopify.dev/docs/apps/getting-started) using [React Router](https://reactrouter.com/). It was forked from the [Shopify Remix app template](https://github.com/Shopify/shopify-app-template-remix) and converted to React Router.
 
 Rather than cloning this repo, follow the [Quick Start steps](https://github.com/Shopify/shopify-app-template-react-router#quick-start).
@@ -103,23 +148,12 @@ For more information on the Shopify Dev MCP please read [the documentation](http
 
 ## Deployment
 
-### Application Storage
+### Application storage
 
-This template uses [Prisma](https://www.prisma.io/) to store session data, by default using an [SQLite](https://www.sqlite.org/index.html) database.
-The database is defined as a Prisma schema in `prisma/schema.prisma`.
-
-This use of SQLite works in production if your app runs as a single instance.
-The database that works best for you depends on the data your app needs and how it is queried.
-Here’s a short list of databases providers that provide a free tier to get started:
-
-| Database   | Type             | Hosters                                                                                                                                                                                                                                    |
-| ---------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| MySQL      | SQL              | [Digital Ocean](https://www.digitalocean.com/products/managed-databases-mysql), [Planet Scale](https://planetscale.com/), [Amazon Aurora](https://aws.amazon.com/rds/aurora/), [Google Cloud SQL](https://cloud.google.com/sql/docs/mysql) |
-| PostgreSQL | SQL              | [Digital Ocean](https://www.digitalocean.com/products/managed-databases-postgresql), [Amazon Aurora](https://aws.amazon.com/rds/aurora/), [Google Cloud SQL](https://cloud.google.com/sql/docs/postgres)                                   |
-| Redis      | Key-value        | [Digital Ocean](https://www.digitalocean.com/products/managed-databases-redis), [Amazon MemoryDB](https://aws.amazon.com/memorydb/)                                                                                                        |
-| MongoDB    | NoSQL / Document | [Digital Ocean](https://www.digitalocean.com/products/managed-databases-mongodb), [MongoDB Atlas](https://www.mongodb.com/atlas/database)                                                                                                  |
-
-To use one of these, you can use a different [datasource provider](https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#datasource) in your `schema.prisma` file, or a different [SessionStorage adapter package](https://github.com/Shopify/shopify-api-js/blob/main/packages/shopify-api/docs/guides/session-storage.md).
+Prisma stores Shopify sessions, sales, and recovery records in PostgreSQL. Use
+a managed PostgreSQL database with backups and a connection string in
+`DATABASE_URL`. The web process and background worker must point to the same
+database.
 
 ### Build
 

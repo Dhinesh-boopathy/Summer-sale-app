@@ -3,7 +3,7 @@ import { SaleItem } from "./SaleItem";
 import { SaleSummary } from "./SaleSummary";
 import { EmptySale } from "./EmptySale";
 
-export function SaleBuilder({ products, onUpdateProduct, onRemoveProduct }) {
+export function SaleBuilder({ products, onUpdateProduct, onRemoveProduct, currencyCode = "USD" }) {
   const { selectedResources, allResourcesSelected, handleSelectionChange } = useIndexResourceState(products);
 
   if (products.length === 0) {
@@ -23,7 +23,7 @@ export function SaleBuilder({ products, onUpdateProduct, onRemoveProduct }) {
             { title: "Image" },
             { title: "Product" },
             { title: "SKU" },
-            { title: "Original Price" },
+            { title: "Lowest Variant Price" },
             { title: "Sale Price" },
             { title: "Discount %" },
             { title: "Action" },
@@ -36,12 +36,13 @@ export function SaleBuilder({ products, onUpdateProduct, onRemoveProduct }) {
               product={product} 
               onUpdate={onUpdateProduct} 
               onRemove={onRemoveProduct} 
+              currencyCode={currencyCode}
             />
           ))}
         </IndexTable>
       </Card>
 
-      <SaleSummary products={products} />
+      <SaleSummary products={products} currencyCode={currencyCode} />
     </BlockStack>
   );
 }

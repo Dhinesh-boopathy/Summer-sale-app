@@ -11,6 +11,7 @@
     "env": "shopify app env",
     "start": "react-router-serve ./build/server/index.js",
     "start:worker": "node scripts/sales-worker.mjs",
+    "test": "node --test",
     "docker-start": "npm run migrate:deploy && npm run start",
     "migrate:deploy": "prisma migrate deploy",
     "setup": "prisma generate && prisma migrate deploy",

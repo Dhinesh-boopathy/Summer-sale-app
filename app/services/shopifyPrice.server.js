@@ -1,4 +1,4 @@
-import shopify from "../shopify.server";
+import shopify from "../shopify.server.js";
 
 export async function getOfflineGraphqlClient(shop) {
   try {
@@ -46,20 +46,11 @@ export async function applyProductVariantsPrice(admin, productId, variants) {
   return true;
 }
 
-export async function applyVariantPrice(admin, productId, variantId, newPrice) {
-  return applyProductVariantsPrice(admin, productId, [
-    {
-      id: variantId,
-      price: newPrice.toString()
-    }
-  ]);
-}
-
 export async function getProductVariantPrices(admin, variantIds) {
   const response = await admin.graphql(`#graphql
     query ProductVariantPrices($ids: [ID!]!) {
       nodes(ids: $ids) {
-        ... on ProductVariant { id price compareAtPrice }
+        ... on ProductVariant { id price compareAtPrice product { id } }
       }
     }
   `, { variables: { ids: variantIds } });
@@ -70,6 +61,29 @@ export async function getProductVariantPrices(admin, variantIds) {
   return new Map(variants.map((variant) => [variant.id, variant]));
 }
 
-export async function restoreVariantPrice(admin, productId, variantId, originalPrice) {
-  return applyVariantPrice(admin, productId, variantId, originalPrice);
+export async function refreshSaleItemPrices(admin, items) {
+  const byId = new Map();
+  const ids = [...new Set(items.map((item) => item.variantId).filter(Boolean))];
+  for (let offset = 0; offset < ids.length; offset += 250) {
+    const variants = await getProductVariantPrices(admin, ids.slice(offset, offset + 250));
+    for (const [id, variant] of variants) byId.set(id, variant);
+  }
+
+  return items.map((item) => {
+    const variant = byId.get(item.variantId);
+    if (!variant || variant.product?.id !== item.productId) {
+      throw new Error(`Could not verify product variant ${item.variantId} in Shopify.`);
+    }
+    const originalPrice = Number(variant.price);
+    const salePrice = Number(item.salePrice);
+    if (!Number.isFinite(originalPrice) || !Number.isFinite(salePrice) || salePrice < 0 || salePrice > originalPrice) {
+      throw new Error(`The sale price for ${item.title} must be between zero and its current Shopify price.`);
+    }
+    return {
+      ...item,
+      originalPrice,
+      originalCompareAtPrice: variant.compareAtPrice ?? null,
+      priceSnapshotComplete: true,
+    };
+  });
 }

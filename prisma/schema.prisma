@@ -48,10 +48,13 @@ model Sale {
   collectionId String?
   collectionTitle String?
   collections Json?
+  claimedAt   DateTime?
+  claimOwner  String?
   items       SaleItem[]
 
   @@index([shop, status, startAt])
   @@index([shop, status, endAt])
+  @@index([claimedAt, claimOwner])
 }
 
 model SaleItem {
@@ -63,16 +66,25 @@ model SaleItem {
   productTitle  String
   sku           String
   originalPrice Float
+  originalCompareAtPrice String?
+  priceSnapshotComplete Boolean @default(false)
   salePrice     Float
   imageUrl      String?
   appliedAt     DateTime?
   restoredAt    DateTime?
+  applyStatus   String   @default("PENDING")
+  restoreStatus String   @default("PENDING")
+  applyAttempts Int      @default(0)
+  restoreAttempts Int    @default(0)
+  lastError     String?
 
   @@index([saleId, appliedAt, restoredAt])
+  @@index([applyStatus, restoreStatus])
 }
 
 model SchedulerLock {
   id          String   @id
   lockedUntil DateTime
+  ownerToken  String?
   updatedAt   DateTime @updatedAt
 }
